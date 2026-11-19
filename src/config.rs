@@ -150,6 +150,8 @@ impl NoteStyle {
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub edge: ScreenEdge,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub monitor: Option<String>,
     pub marker_offset: f64,
     pub edge_hover_enabled: bool,
     pub launch_at_login: bool,
@@ -180,6 +182,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             edge: ScreenEdge::Right,
+            monitor: None,
             marker_offset: 0.5,
             edge_hover_enabled: true,
             launch_at_login: false,

@@ -390,6 +390,40 @@ fn usable_monitor(monitor: &gtk::gdk::Monitor) -> bool {
     monitor.is_valid() && geometry.width() > 0 && geometry.height() > 0
 }
 
+fn monitor_key(monitor: &gtk::gdk::Monitor) -> Option<String> {
+    monitor
+        .connector()
+        .filter(|connector| !connector.is_empty())
+        .map(|connector| connector.to_string())
+        .or_else(|| {
+            monitor
+                .model()
+                .filter(|model| !model.is_empty())
+                .map(|model| model.to_string())
+        })
+}
+
+fn choose_monitor(
+    monitors: &[gtk::gdk::Monitor],
+    configured: Option<&str>,
+    previous: Option<&gtk::gdk::Monitor>,
+) -> Option<gtk::gdk::Monitor> {
+    if let Some(name) = configured.filter(|name| !name.is_empty())
+        && let Some(monitor) = monitors
+            .iter()
+            .find(|monitor| monitor_key(monitor).as_deref() == Some(name))
+    {
+        return Some(monitor.clone());
+    }
+    if configured.is_some()
+        && let Some(previous) =
+            previous.filter(|previous| monitors.iter().any(|monitor| monitor == *previous))
+    {
+        return Some(previous.clone());
+    }
+    monitors.first().cloned()
+}
+
 impl Drop for Strip {
     fn drop(&mut self) {
         self.disconnect_monitors();
@@ -432,7 +466,7 @@ impl Strip {
         }
     }
 
-    pub(super) fn new(application: &gtk::Application) -> Self {
+    pub(super) fn new(application: &gtk::Application, configured_monitor: Option<&str>) -> Self {
         let (_, initial) = transition(
             EdgeState::Dormant,
             EdgeEvent::Refresh,
@@ -466,11 +500,13 @@ impl Strip {
         strip_window.set_namespace(Some("stickies-strip"));
         strip_window.set_exclusive_zone(-1);
         strip_window.set_keyboard_mode(initial.strip_keyboard);
-        let monitor = gtk::prelude::WidgetExt::display(&window)
+        let monitors: Vec<_> = gtk::prelude::WidgetExt::display(&window)
             .monitors()
             .iter::<gtk::gdk::Monitor>()
             .filter_map(Result::ok)
-            .find(usable_monitor);
+            .filter(usable_monitor)
+            .collect();
+        let monitor = choose_monitor(&monitors, configured_monitor, None);
         for window in [&window, &strip_window] {
             window.set_monitor(monitor.as_ref());
             window.set_anchor(Edge::Left, true);
@@ -1284,7 +1320,7 @@ impl Ui {
             })));
     }
 
-    fn recover_monitor(self: &Rc<Self>) {
+    pub(super) fn recover_monitor(self: &Rc<Self>) {
         let monitors = gtk::prelude::WidgetExt::display(&self.edge.window).monitors();
         let available: Vec<_> = monitors
             .iter::<gtk::gdk::Monitor>()
@@ -1292,11 +1328,8 @@ impl Ui {
             .filter(usable_monitor)
             .collect();
         let previous = self.edge.monitor.borrow().clone();
-        let selected = previous
-            .as_ref()
-            .filter(|monitor| available.contains(monitor))
-            .cloned()
-            .or_else(|| available.first().cloned());
+        let configured = self.config.borrow().monitor.clone();
+        let selected = choose_monitor(&available, configured.as_deref(), previous.as_ref());
         let changed = previous != selected;
         let layout_changed = self.edge.monitor_layout_dirty.replace(false);
         if !changed && !layout_changed && !self.edge.remapping.get() {
@@ -2729,7 +2762,15 @@ impl Ui {
         position(self.edge.tabs.upcast_ref(), tx, ty);
         // Dormant state has no visible trigger. The whole screen edge is the
         // hover/click target, so keep a full-length strip of input there.
-        let trigger_depth = crate::edge_surface::scale_px(12);
+        let edge_length = if horizontal {
+            screen_height
+        } else {
+            screen_width
+        };
+        let trigger_depth = (edge_length / 100).clamp(
+            crate::edge_surface::scale_px(12),
+            crate::edge_surface::scale_px(32),
+        );
         let trigger = match config.edge {
             ScreenEdge::Left => (0, 0, trigger_depth, screen_height),
             ScreenEdge::Right => (

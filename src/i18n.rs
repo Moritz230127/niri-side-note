@@ -67,6 +67,8 @@ fn tr(text: &str) -> Option<&'static str> {
         "Cancel" => "取消",
         "Done" => "完成",
         "Settings" => "设置",
+        "Screen" => "屏幕",
+        "自动（第一块屏幕）" => "自动（第一块屏幕）",
         "Mode" => "模式",
         "System" => "跟随系统",
         "Light" => "浅色",

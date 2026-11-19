@@ -675,8 +675,10 @@ impl Ui {
         let login_changed = self.config.borrow().launch_at_login != config.launch_at_login;
         let timeout_changed = self.config.borrow().inactivity_seconds != config.inactivity_seconds;
         let motion_changed = self.config.borrow().reduced_motion != config.reduced_motion;
+        let monitor_changed = self.config.borrow().monitor != config.monitor;
         if self.config.borrow().edge != config.edge
             || self.config.borrow().marker_offset != config.marker_offset
+            || monitor_changed
         {
             self.edge.docked_offset.set(None);
             self.edge.strip_offset.set(None);
@@ -687,9 +689,13 @@ impl Ui {
             apply_motion_preference(config.reduced_motion);
         }
         appearance::apply(&self.provider, &config);
-        self.place_edge();
-        self.update_visibility();
-        self.refresh_tabs();
+        if monitor_changed {
+            self.recover_monitor();
+        } else {
+            self.place_edge();
+            self.update_visibility();
+            self.refresh_tabs();
+        }
         if let Some(editor) = self.edge.docked.borrow().as_ref() {
             editor.refresh_appearance();
             if timeout_changed {
@@ -887,7 +893,7 @@ fn build(application: &gtk::Application, startup_error_pending: &Rc<Cell<bool>>)
             gtk::STYLE_PROVIDER_PRIORITY_USER + 1,
         );
     }
-    let edge = edge::Strip::new(application);
+    let edge = edge::Strip::new(application, config.monitor.as_deref());
     let ui = Rc::new(Ui {
         sessions: RefCell::new(HashMap::new()),
         application: application.clone(),

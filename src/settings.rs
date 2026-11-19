@@ -79,6 +79,7 @@ struct PositionControls {
     edges: Vec<gtk::ToggleButton>,
     presets: Vec<gtk::ToggleButton>,
     layouts: Vec<gtk::ToggleButton>,
+    screens: Vec<(gtk::ToggleButton, Option<String>)>,
     error: gtk::Label,
     current: Rc<RefCell<Config>>,
     syncing: Cell<bool>,
@@ -111,6 +112,9 @@ impl PositionControls {
         {
             button.set_active(config.tab_layout == layout);
         }
+        for (button, monitor) in &self.screens {
+            button.set_active(config.monitor.as_deref() == monitor.as_deref());
+        }
         self.syncing.set(false);
     }
     fn result(&self, result: Result<(), String>) {
@@ -128,6 +132,8 @@ impl PositionControls {
         reposition: impl Fn() -> Result<(), String> + 'static,
     ) -> Rc<Self> {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 16);
+        let screens = screen_choices(current.borrow().monitor.as_deref());
+        section(&root, "Screen", &screens.0);
         let edges = choices(&["Left", "Right", "Top", "Bottom"], 0);
         let presets = choices(&["Top", "Center", "Bottom"], 1);
         section(&root, "Edge", &edges.0);
@@ -151,6 +157,7 @@ impl PositionControls {
             edges: edges.1,
             presets: presets.1,
             layouts: layouts.1,
+            screens: screens.1,
             error,
             current,
             syncing: Cell::new(false),
@@ -185,6 +192,20 @@ impl PositionControls {
                 {
                     let mut config = controls.current.borrow().clone();
                     config.marker_offset = index as f64 / 2.;
+                    controls.result(change(config));
+                }
+            });
+        }
+        for (button, monitor) in controls.screens.clone() {
+            let weak = Rc::downgrade(&controls);
+            let change = change.clone();
+            button.connect_toggled(move |button| {
+                if let Some(controls) = weak.upgrade()
+                    && !controls.syncing.get()
+                    && button.is_active()
+                {
+                    let mut config = controls.current.borrow().clone();
+                    config.monitor = monitor.clone();
                     controls.result(change(config));
                 }
             });
@@ -512,9 +533,65 @@ pub fn build(
     }
 }
 
+fn screen_button(label: &str, group: Option<&gtk::ToggleButton>) -> gtk::ToggleButton {
+    let button = gtk::ToggleButton::new();
+    let text = gtk::Label::new(Some(label));
+    text.set_xalign(0.);
+    button.set_child(Some(&text));
+    button.set_halign(gtk::Align::Fill);
+    button.set_hexpand(true);
+    button.set_group(group);
+    button
+}
+
+fn screen_choices(current: Option<&str>) -> (gtk::Box, Vec<(gtk::ToggleButton, Option<String>)>) {
+    let list = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    list.add_css_class("segments");
+    let mut buttons: Vec<(gtk::ToggleButton, Option<String>)> = Vec::new();
+    let automatic = screen_button("自动（第一块屏幕）", None);
+    list.append(&automatic);
+    buttons.push((automatic.clone(), None));
+    if let Some(display) = gtk::gdk::Display::default() {
+        for monitor in display
+            .monitors()
+            .iter::<gtk::gdk::Monitor>()
+            .filter_map(Result::ok)
+            .filter(|monitor| {
+                let geometry = monitor.geometry();
+                monitor.is_valid() && geometry.width() > 0 && geometry.height() > 0
+            })
+        {
+            let connector = monitor.connector().map(|value| value.to_string());
+            let model = monitor
+                .model()
+                .map(|value| value.to_string())
+                .unwrap_or_default();
+            let geometry = monitor.geometry();
+            let name = connector.filter(|value| !value.is_empty()).unwrap_or(model);
+            if name.is_empty() {
+                continue;
+            }
+            let label = format!("{name} · {}×{}", geometry.width(), geometry.height());
+            let button = screen_button(&label, Some(&automatic));
+            list.append(&button);
+            buttons.push((button, Some(name)));
+        }
+    }
+    if let Some(current) = current
+        && !buttons
+            .iter()
+            .any(|(_, monitor)| monitor.as_deref() == Some(current))
+    {
+        let button = screen_button(&format!("{current}（未连接）"), Some(&automatic));
+        list.append(&button);
+        buttons.push((button, Some(current.to_owned())));
+    }
+    (list, buttons)
+}
+
 fn section(root: &gtk::Box, name: &str, control: &impl IsA<gtk::Widget>) {
     // Give the four-way choices and position presets the drawer's full width.
-    let stacked = matches!(name, "Edge" | "Position" | "Auto-close");
+    let stacked = matches!(name, "Screen" | "Edge" | "Position" | "Auto-close");
     let box_ = gtk::Box::new(
         if stacked {
             gtk::Orientation::Vertical
