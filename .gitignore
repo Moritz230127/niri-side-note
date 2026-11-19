@@ -5,3 +5,6 @@
 
 # Rust build output
 /target/
+
+# Release packaging output
+/dist/
