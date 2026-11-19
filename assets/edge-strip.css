@@ -182,8 +182,20 @@
 .edge-window.edge-minimal-dark .edge-delete-toast { background: #22252C; color: #F0F0EE; border-color: alpha(#F0F0EE, .16); box-shadow: 0 2px 4px alpha(black, .35); }
 .edge-window .edge-delete-toast button { background: transparent; color: inherit; border: none; box-shadow: none; padding: 4px 6px; min-height: 22px; border-radius: 5px; font-size: 13px; }
 
-/* Thin inner accent keeps document tabs recognisable without heavy chrome. */
-.edge-window .edge-accent-line { border-radius: 2px; }
+/* Paper/Playful: the accent follows the tab's rounded silhouette via its border,
+   so there is no separate strip overhanging the corners. */
+.edge-window.edge-paper.edge-right button.note-tab,
+.edge-window.edge-playful.edge-right button.note-tab {
+  border-left-color: var(--edge-accent); border-left-width: 2px; }
+.edge-window.edge-paper.edge-left button.note-tab,
+.edge-window.edge-playful.edge-left button.note-tab {
+  border-right-color: var(--edge-accent); border-right-width: 2px; }
+.edge-window.edge-paper.edge-top button.note-tab,
+.edge-window.edge-playful.edge-top button.note-tab {
+  border-bottom-color: var(--edge-accent); border-bottom-width: 2px; }
+.edge-window.edge-paper.edge-bottom button.note-tab,
+.edge-window.edge-playful.edge-bottom button.note-tab {
+  border-top-color: var(--edge-accent); border-top-width: 2px; }
 
 /* Classic reveals one continuous tab from off screen; no shadow seam. */
 .edge-window.edge-classic .tab-title { font-weight: 500; letter-spacing: 0; }

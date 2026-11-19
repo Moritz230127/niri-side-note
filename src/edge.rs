@@ -2090,32 +2090,9 @@ impl Ui {
                 text.set_child_transform(&label, Some(&transform));
                 text.upcast()
             };
-            let overlay = gtk::Overlay::new();
-            overlay.set_child(Some(&content));
-            let accent = gtk::Box::new(gtk::Orientation::Vertical, 0);
-            accent.add_css_class("edge-accent-line");
-            accent.set_can_target(false);
-            appearance::set_color(&accent, note.color);
-            accent.set_opacity(if is_active { 1.0 } else { 0.55 });
-            if horizontal {
-                accent.set_size_request(-1, s(3));
-                accent.set_hexpand(true);
-                accent.set_valign(if config.edge == ScreenEdge::Top {
-                    gtk::Align::End
-                } else {
-                    gtk::Align::Start
-                });
-            } else {
-                accent.set_size_request(s(3), -1);
-                accent.set_vexpand(true);
-                accent.set_halign(if config.edge == ScreenEdge::Right {
-                    gtk::Align::Start
-                } else {
-                    gtk::Align::End
-                });
-            }
-            overlay.add_overlay(&accent);
-            tab.set_child(Some(&overlay));
+            // 色线由 CSS 画在按钮边框/内阴影里，跟随圆角裁剪；
+            // 不再叠加独立色条，避免在标签圆角处露出锯齿状色块。
+            tab.set_child(Some(&content));
             let extension = if config.tab_layout == config::TabLayout::Classic {
                 s(6)
             } else {
