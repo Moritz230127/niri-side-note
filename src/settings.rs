@@ -78,7 +78,6 @@ struct PositionControls {
     root: gtk::Box,
     edges: Vec<gtk::ToggleButton>,
     presets: Vec<gtk::ToggleButton>,
-    counts: Vec<gtk::ToggleButton>,
     layouts: Vec<gtk::ToggleButton>,
     error: gtk::Label,
     current: Rc<RefCell<Config>>,
@@ -104,9 +103,6 @@ impl PositionControls {
         for (index, button) in self.presets.iter().enumerate() {
             button.set_label(labels[index]);
             button.set_active((config.marker_offset - index as f64 / 2.).abs() < 0.000001);
-        }
-        for (button, count) in self.counts.iter().zip([4, 5]) {
-            button.set_active(config.visible_notes == count);
         }
         for (button, layout) in self
             .layouts
@@ -142,8 +138,6 @@ impl PositionControls {
         move_button.add_css_class("reposition-button");
         position.append(&move_button);
         section(&root, "Position", &position);
-        let counts = choices(&["4", "5"], 0);
-        section(&root, "Visible notes", &counts.0);
         let layouts = choices(&["Classic", "Stacked"], 1);
         section(&root, "Tabs", &layouts.0);
         let error = gtk::Label::new(None);
@@ -156,7 +150,6 @@ impl PositionControls {
             root,
             edges: edges.1,
             presets: presets.1,
-            counts: counts.1,
             layouts: layouts.1,
             error,
             current,
@@ -192,20 +185,6 @@ impl PositionControls {
                 {
                     let mut config = controls.current.borrow().clone();
                     config.marker_offset = index as f64 / 2.;
-                    controls.result(change(config));
-                }
-            });
-        }
-        for (index, button) in controls.counts.iter().enumerate() {
-            let weak = Rc::downgrade(&controls);
-            let change = change.clone();
-            button.connect_toggled(move |button| {
-                if let Some(controls) = weak.upgrade()
-                    && !controls.syncing.get()
-                    && button.is_active()
-                {
-                    let mut config = controls.current.borrow().clone();
-                    config.visible_notes = [4, 5][index];
                     controls.result(change(config));
                 }
             });

@@ -113,13 +113,28 @@ const HEIGHT: i32 = 500;
 const TAB_GAP: i32 = -8;
 fn tab_gap(config: &Config) -> i32 {
     match config.tab_layout {
-        config::TabLayout::Classic => 8,
-        config::TabLayout::Stacked => TAB_GAP,
+        config::TabLayout::Classic => crate::edge_surface::scale_px(8),
+        config::TabLayout::Stacked => crate::edge_surface::scale_px(TAB_GAP),
     }
 }
 // Covers the largest horizontal wave at either end, including its shadow.
 const TAB_INSET: i32 = 24;
 const TAB_MAGNIFICATION: f64 = 0.24;
+const MAX_EDGE_NOTES: usize = 20;
+
+// Fixed-length tabs first sit centered. Once their natural span no longer
+// fits the edge, increase the overlap until the group fills the available
+// length. A tab always keeps at least 28 logical pixels visible.
+fn deck_gap(config: &Config, count: usize, length: i32, available: i32) -> i32 {
+    if count <= 1 {
+        return 0;
+    }
+    let natural = tab_gap(config);
+    let inner = (available - 2 * TAB_INSET).max(length);
+    let fit = (inner - count as i32 * length).div_euclid(count as i32 - 1);
+    let minimum = -(length - crate::edge_surface::scale_px(28)).max(0);
+    fit.min(natural).max(minimum)
+}
 
 // Draw toward the hovered tab from either end. A neighbor must not be trapped
 // behind both the hovered tab and a more distant tab. Clicks use the reverse.
@@ -324,6 +339,7 @@ pub(super) struct Strip {
     pub(super) strip_root: gtk::Overlay,
     pub(super) strip_offset: Cell<Option<i32>>,
     pub(super) horizontal_tab_width: Cell<i32>,
+    pub(super) tab_gap: Cell<i32>,
     pub(super) reposition_error: gtk::Label,
     pub(super) strip_bounds: Cell<(i32, i32, i32, i32)>,
     pub(super) panel_bounds: Cell<(i32, i32, i32, i32)>,
@@ -598,6 +614,7 @@ impl Strip {
             strip_root,
             strip_offset: Cell::new(None),
             horizontal_tab_width: Cell::new(0),
+            tab_gap: Cell::new(0),
             reposition_error,
             strip_bounds: Cell::new((0, 0, 0, 0)),
             panel_bounds: Cell::new((0, 0, 0, 0)),
@@ -877,11 +894,11 @@ impl Ui {
         fixed: &gtk::Fixed,
         tab: &gtk::Widget,
         config: &Config,
+        gap: i32,
         index: usize,
         progress: f64,
         hovers: &[Rc<motion::Motion>],
     ) {
-        let gap = tab_gap(config);
         let edge = config.edge;
         let length = if matches!(edge, ScreenEdge::Top | ScreenEdge::Bottom) {
             tab.width_request()
@@ -979,6 +996,7 @@ impl Ui {
                 &fixed,
                 &tab,
                 &self.config.borrow(),
+                self.edge.tab_gap.get(),
                 index,
                 self.edge.strip_motion.value(),
                 &hovers,
@@ -1905,7 +1923,7 @@ impl Ui {
         let config = self.config.borrow().clone();
         let notes = match self
             .storage
-            .load_deck_notes(config.visible_notes, self.edge_sort.get())
+            .load_deck_notes(MAX_EDGE_NOTES, self.edge_sort.get())
         {
             Ok(notes) => notes,
             Err(error) => {
@@ -1928,66 +1946,34 @@ impl Ui {
         let depth = s(24);
         // Measure the upright titles, but cap their contribution so a long title
         // cannot widen the whole strip. Both orientations use a slim 24px depth.
+        // Fixed tab length. The group starts centered and grows toward both
+        // ends as notes are added; once the edge is full, the gap becomes more
+        // negative so the tabs overlap instead of shrinking or stretching.
+        let tab_length = if horizontal {
+            s(112)
+        } else if config.tab_layout == config::TabLayout::Classic {
+            s(104)
+        } else {
+            s(80)
+        };
+        let utility_length = 3 * depth;
+        let (screen_width, screen_height) = self.note_limits();
+        let screen_length = if horizontal {
+            screen_width
+        } else {
+            screen_height
+        };
+        let available = (screen_length - utility_length - self.edge.tabs.spacing()).max(tab_length);
+        let gap = deck_gap(&config, notes.len(), tab_length, available);
+        self.edge.tab_gap.set(gap);
         let tab_width = if horizontal {
-            let weight = if config.tab_layout == config::TabLayout::Classic {
-                "Medium"
-            } else {
-                "Semi-Bold"
-            };
-            let font_desc =
-                gtk::pango::FontDescription::from_string(&format!("Inter {weight} {}px", s(11)));
-            let title_width = notes
-                .iter()
-                .map(|note| {
-                    let title = if note.title.trim().is_empty() {
-                        "Untitled note"
-                    } else {
-                        &note.title
-                    };
-                    let title = if config.tab_layout == config::TabLayout::Classic {
-                        title.to_owned()
-                    } else {
-                        note.title.to_uppercase()
-                    };
-                    let layout = self.edge.tabs.create_pango_layout(Some(&title));
-                    layout.set_font_description(Some(&font_desc));
-                    layout.pixel_size().0
-                })
-                .max()
-                .unwrap_or(0);
-            let (screen_width, _) = self.note_limits();
-            let count = notes.len().max(1) as i32;
-            let reserved = (count - 1) * tab_gap(&config)
-                + 2 * TAB_INSET
-                + self.edge.tabs.spacing()
-                + 3 * depth
-                + 2 * motion::HOVER_PAD;
-            let available = ((screen_width - reserved) / count).max(depth);
-            let width =
-                if self.edge.state().is_revealed() && self.edge.horizontal_tab_width.get() > 0 {
-                    self.edge.horizontal_tab_width.get()
-                } else {
-                    (title_width + s(20)).clamp(s(80), s(112))
-                }
-                .min(available);
-            self.edge.horizontal_tab_width.set(width);
-            width
+            self.edge.horizontal_tab_width.set(tab_length);
+            tab_length
         } else {
             self.edge.horizontal_tab_width.set(0);
             depth
         };
-        let tab_height = if horizontal {
-            depth
-        } else {
-            let (_, screen_height) = self.note_limits();
-            let count = notes.len().max(1) as i32;
-            let reserved = (count - 1) * tab_gap(&config)
-                + 2 * TAB_INSET
-                + self.edge.tabs.spacing()
-                + 3 * depth
-                + 2 * motion::HOVER_PAD;
-            ((screen_height - reserved) / count).max(depth)
-        };
+        let tab_height = if horizontal { depth } else { tab_length };
         let fixed = glib::Object::new::<TabLayout>().upcast::<gtk::Fixed>();
         fixed
             .downcast_ref::<TabLayout>()
@@ -1995,7 +1981,7 @@ impl Ui {
             .imp()
             .pointer
             .set(f64::NAN);
-        let gap = tab_gap(&config);
+        let gap = self.edge.tab_gap.get();
         let inset = 2 * TAB_INSET;
 
         fixed.set_overflow(gtk::Overflow::Visible);
@@ -2786,7 +2772,10 @@ impl Ui {
                         tab.height_request()
                     };
                     self.edge.pointer_origin.set(Some(
-                        offset + TAB_INSET + index * (length + tab_gap(&config)) + length / 2,
+                        offset
+                            + TAB_INSET
+                            + index * (length + self.edge.tab_gap.get())
+                            + length / 2,
                     ));
                     break;
                 }

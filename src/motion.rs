@@ -8,7 +8,6 @@ pub const REVEAL_MS: u32 = 160;
 pub const COLLAPSE_MS: u32 = 110;
 pub const PANEL_MS: u32 = 120;
 pub const HOVER_MS: u32 = 120;
-pub const HOVER_PAD: i32 = 4;
 
 struct Running {
     value: Cell<f64>,
