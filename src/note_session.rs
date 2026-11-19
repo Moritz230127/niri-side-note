@@ -63,7 +63,7 @@ impl NoteSession {
                 crate::text_editing::apply(&body, &spans);
                 None
             }
-            Err(error) => Some(format!("Could not load text formatting: {error}")),
+            Err(error) => Some(format!("无法加载文本格式：{error}")),
         };
         let initial = EditState {
             title: note.title,
@@ -359,9 +359,8 @@ impl NoteSession {
         if self.draft.get() && !other_view {
             if self.is_blank() && self.storage.is_archived(self.id()).ok() == Some(false) {
                 if let Err(error) = self.storage.delete_note(self.id()) {
-                    self.error.replace(Some(format!(
-                        "Could not remove the empty note. Retry closing it. {error}"
-                    )));
+                    self.error
+                        .replace(Some(format!("无法移除空白便签，请重试关闭。{error}")));
                     self.notify();
                     return false;
                 }
@@ -420,7 +419,7 @@ impl NoteSession {
                 button.add_css_class("inline-check");
                 button.set_focus_on_click(false);
                 button.set_active(active);
-                button.update_property(&[gtk::accessible::Property::Label("Completed")]);
+                button.update_property(&[gtk::accessible::Property::Label("已完成")]);
                 let weak = Rc::downgrade(self);
                 let target = anchor.clone();
                 button.connect_toggled(move |b| {
@@ -498,7 +497,7 @@ impl NoteSession {
             }
             Err(error) => {
                 self.style_error
-                    .replace(Some(format!("Could not save appearance: {error}")));
+                    .replace(Some(format!("无法保存外观：{error}")));
             }
         }
         self.notify();
@@ -514,7 +513,7 @@ impl NoteSession {
             }
             Err(error) => {
                 self.pin_error
-                    .replace(Some(format!("Could not change pin: {error}")));
+                    .replace(Some(format!("无法更改置顶：{error}")));
             }
         }
         self.notify();
@@ -587,9 +586,8 @@ impl NoteSession {
                 true
             }
             Err(error) => {
-                self.error.replace(Some(format!(
-                    "Could not save. Keep this note open and retry. {error}"
-                )));
+                self.error
+                    .replace(Some(format!("保存失败。请保持便签打开后重试。{error}")));
                 self.notify();
                 false
             }
@@ -660,7 +658,7 @@ pub fn readonly_checklists(view: &gtk::TextView) {
         check.set_active(active);
         check.set_can_target(false);
         check.set_focusable(false);
-        check.update_property(&[gtk::accessible::Property::Label("Completed")]);
+        check.update_property(&[gtk::accessible::Property::Label("已完成")]);
         view.add_child_at_anchor(&check, &anchor);
     }
     decorate_checklists(&buffer);

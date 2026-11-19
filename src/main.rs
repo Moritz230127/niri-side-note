@@ -13,7 +13,6 @@ mod edge;
 mod edge_surface;
 mod edit_history;
 mod editor;
-mod i18n;
 mod manager;
 mod motion;
 mod note_controls;
@@ -87,9 +86,7 @@ impl Ui {
             if !session.flush() {
                 errors.push((
                     session.id(),
-                    session
-                        .error()
-                        .unwrap_or_else(|| "Unknown save error".into()),
+                    session.error().unwrap_or_else(|| "未知保存错误".into()),
                 ));
             }
         }
@@ -98,10 +95,7 @@ impl Ui {
 
     fn flush_sessions_on_shutdown(&self) {
         for (id, error) in self.flush_sessions() {
-            eprintln!(
-                "Stickies could not save note {} on shutdown: {error}",
-                id.value()
-            );
+            eprintln!("Stickies 关闭时无法保存便签 {}：{error}", id.value());
         }
     }
 
@@ -124,14 +118,14 @@ impl Ui {
         };
         let details = errors
             .into_iter()
-            .map(|(id, error)| format!("Note {}: {error}", id.value()))
+            .map(|(id, error)| format!("便签 {}：{error}", id.value()))
             .collect::<Vec<_>>()
             .join("\n");
         let dialog = gtk::AlertDialog::builder()
             .modal(true)
-            .message("Stickies could not save your notes")
+            .message("Stickies 无法保存你的便签")
             .detail(format!(
-                "Your edits are still open. Retry Quit after resolving the save error.\n\n{details}"
+                "你的编辑仍未保存。请解决保存错误后再退出。\n\n{details}"
             ))
             .build();
         let hold = self.application.hold();
@@ -227,7 +221,7 @@ impl Ui {
                     editor.title.grab_focus();
                 }
             }
-            Err(error) => self.error(&format!("Could not create a note: {error}")),
+            Err(error) => self.error(&format!("无法新建便签：{error}")),
         }
     }
     fn note_session(self: &Rc<Self>, id: NoteId) -> Option<Rc<note_session::NoteSession>> {
@@ -237,7 +231,7 @@ impl Ui {
         let note = match self.storage.load_note(id) {
             Ok(note) => note,
             Err(error) => {
-                self.error(&format!("Could not open note: {error}"));
+                self.error(&format!("无法打开便签：{error}"));
                 return None;
             }
         };
@@ -299,7 +293,7 @@ impl Ui {
                     && editor.flush()
                 {
                     if let Err(error) = manager::change_collection(&ui.storage, id, change) {
-                        editor.message(&format!("Could not update note: {error}"));
+                        editor.message(&format!("无法更新便签：{error}"));
                         return;
                     }
                     ui.finish_change(id, change);
@@ -419,7 +413,7 @@ impl Ui {
         let s = edge_surface::scale_px;
         let window = gtk::ApplicationWindow::builder()
             .application(&self.application)
-            .title("Stickies · Note")
+            .title("Stickies · 便签")
             .default_width(s(editor::WIDTH))
             .default_height(s(editor::HEIGHT))
             .decorated(false)
@@ -621,13 +615,13 @@ impl Ui {
                 reposition: Rc::new(move || {
                     reposition
                         .upgrade()
-                        .ok_or_else(|| "Stickies is closing".to_owned())?
+                        .ok_or_else(|| "Stickies 正在退出".to_owned())?
                         .begin_reposition()
                 }),
                 settings: Rc::new(move |config| {
                     settings
                         .upgrade()
-                        .ok_or_else(|| "Stickies is closing".to_owned())?
+                        .ok_or_else(|| "Stickies 正在退出".to_owned())?
                         .change_settings(config)
                 }),
             },
@@ -664,10 +658,10 @@ impl Ui {
 
     fn change_settings(self: &Rc<Self>, config: Config) -> Result<(), String> {
         if self.edge.state().is_repositioning() {
-            return Err("Choose Done or Cancel before changing Settings.".into());
+            return Err("更改设置前请先选择“完成”或“取消”。".into());
         }
         if !self.config_valid {
-            return Err("The existing configuration is invalid. Correct it before saving settings; it has not been overwritten.".into());
+            return Err("现有配置无效。请先修正再保存设置；当前文件尚未被覆盖。".into());
         }
         config
             .save(&config::config_path())
@@ -709,9 +703,8 @@ impl Ui {
             manager.refresh_appearance();
         }
         if login_changed {
-            autostart::reconcile(&autostart::autostart_path(), config.launch_at_login).map_err(
-                |e| format!("Settings saved, but launch at login could not be updated: {e}"),
-            )?;
+            autostart::reconcile(&autostart::autostart_path(), config.launch_at_login)
+                .map_err(|e| format!("设置已保存，但开机自启更新失败：{e}"))?;
         }
         Ok(())
     }
@@ -765,18 +758,17 @@ fn main() -> glib::ExitCode {
     application.connect_activate(move |application| {
         if application.windows().is_empty() && !pending.get() {
             if let Err(error) = adw::init() {
-                eprintln!("Could not initialize the desktop UI: {error}");
+                eprintln!("无法初始化桌面界面：{error}");
                 application.quit();
                 return;
             }
             edge_surface::configure_display_dpi();
             if let Err(error) = ui_assets::register() {
-                eprintln!("Could not load UI assets: {error}");
+                eprintln!("无法加载界面资源：{error}");
                 application.quit();
                 return;
             }
             build(application, &pending);
-            i18n::install();
         }
     });
     application.connect_command_line(move |application, command_line| {
@@ -791,7 +783,7 @@ fn main() -> glib::ExitCode {
         application.activate();
         if let Some(name) = action {
             if application.lookup_action(name).is_none() {
-                eprintln!("Stickies could not initialize the requested action.");
+                eprintln!("Stickies 无法执行请求的操作。");
                 return glib::ExitCode::FAILURE;
             }
             application.activate_action(name, None);
@@ -812,7 +804,7 @@ fn build(application: &gtk::Application, startup_error_pending: &Rc<Cell<bool>>)
         Err(error) => {
             let dialog = gtk::AlertDialog::builder()
                 .modal(false)
-                .message("Stickies could not open your notes")
+                .message("Stickies 无法打开你的便签")
                 .detail(error.to_string())
                 .build();
             let hold = application.hold();
@@ -832,7 +824,7 @@ fn build(application: &gtk::Application, startup_error_pending: &Rc<Cell<bool>>)
     let (mut config, valid) = match Config::load(&config::config_path()) {
         Ok(config) => (config, true),
         Err(error) => {
-            eprintln!("Stickies ignored invalid configuration: {error}");
+            eprintln!("Stickies 忽略了无效配置：{error}");
             (Config::default(), false)
         }
     };
@@ -846,16 +838,14 @@ fn build(application: &gtk::Application, startup_error_pending: &Rc<Cell<bool>>)
             config.legacy_note_defaults[0].then_some(config.font),
             config.legacy_note_defaults[1].then_some(config.paper),
         ) {
-            eprintln!("Stickies could not preserve per-note appearance: {error}");
+            eprintln!("Stickies 无法保留便签外观：{error}");
             return None;
         }
         config.font = config::Font::Theme;
         config.paper = config::Paper::Plain;
         config.legacy_note_defaults = [false; 2];
         if let Err(error) = config.save(&config::config_path()) {
-            eprintln!(
-                "Stickies preserved note styles but could not retire global defaults: {error}"
-            );
+            eprintln!("Stickies 保留了便签样式，但无法清理全局默认值：{error}");
             return None;
         }
     }
@@ -863,7 +853,7 @@ fn build(application: &gtk::Application, startup_error_pending: &Rc<Cell<bool>>)
         && let Err(error) =
             autostart::reconcile(&autostart::autostart_path(), config.launch_at_login)
     {
-        eprintln!("Stickies could not update launch at login: {error}");
+        eprintln!("Stickies 无法更新开机自启：{error}");
     }
     let provider = gtk::CssProvider::new();
     appearance::apply(&provider, &config);

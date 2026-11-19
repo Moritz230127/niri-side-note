@@ -287,19 +287,19 @@ pub enum ConfigError {
 impl fmt::Display for ConfigError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io(error) => write!(formatter, "could not access the configuration: {error}"),
-            Self::Parse(error) => write!(formatter, "invalid configuration: {error}"),
+            Self::Io(error) => write!(formatter, "无法读取配置文件：{error}"),
+            Self::Parse(error) => write!(formatter, "配置文件无效：{error}"),
             Self::Serialize(error) => {
-                write!(formatter, "could not encode the configuration: {error}")
+                write!(formatter, "无法编码配置文件：{error}")
             }
             Self::InvalidMarkerOffset(offset) => {
                 write!(
                     formatter,
-                    "marker_offset must be between 0 and 1, got {offset}"
+                    "marker_offset 必须在 0 到 1 之间，当前为 {offset}"
                 )
             }
             Self::InvalidValue(message) => formatter.write_str(message),
-            Self::MissingParent => write!(formatter, "configuration path has no parent directory"),
+            Self::MissingParent => write!(formatter, "配置路径没有父目录"),
         }
     }
 }

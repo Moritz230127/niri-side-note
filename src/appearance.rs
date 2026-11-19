@@ -108,7 +108,7 @@ pub fn palette_css() -> String {
                 ".icon-control.{class} {{ color: rgb({r},{g},{b}); }}
             .note-tab.{class} {{ --edge-accent: rgb({r},{g},{b}); }}
             .edge-result-color.{class}, .management .{class} .tag-bar, .current-color-dot.{class},
-            .edge-color-bar.{class}, .note-controls .color-swatch.{class} {{ background: rgb({r},{g},{b}); }}
+            .edge-accent-line.{class}, .note-controls .color-swatch.{class} {{ background: rgb({r},{g},{b}); }}
             .tab-badge.{class} {{ background: rgb({r},{g},{b}); color: {swatch_ink}; }}
             .note-controls .color-swatch.{class} {{ color: {swatch_ink}; }}
             "
@@ -119,10 +119,10 @@ pub fn palette_css() -> String {
 
 pub fn apply(provider: &gtk::CssProvider, config: &Config) {
     let is_dark = config.theme == Theme::Minimal && dark(config);
-    let (bg, fg, muted, line) = if is_dark {
-        ("#22252c", "#f0f0ee", "#afb3ba", "#454953")
+    let (bg, active_bg, fg, muted, line) = if is_dark {
+        ("#22252c", "#2e333d", "#f0f0ee", "#afb3ba", "#454953")
     } else {
-        ("#f8f7f3", "#2d2c29", "#7d7971", "#e3e0d8")
+        ("#f8f7f3", "#ffffff", "#2d2c29", "#7d7971", "#e3e0d8")
     };
     let font = match config.font {
         Font::Theme if config.theme != Theme::Minimal => "'Virgil 3 YOFF', cursive",
@@ -158,6 +158,7 @@ pub fn apply(provider: &gtk::CssProvider, config: &Config) {
         .icon-control {{ background: transparent; border: none; box-shadow: none; min-width: 24px; min-height: 24px; padding: 5px; border-radius: 7px; }}
         .icon-control > button {{ background: transparent; border: none; box-shadow: none; color: inherit; }}
         .note-tab {{ background: {bg}; color: {fg}; padding: 0; min-width: 0; min-height: 0; }}
+        button.note-tab.active {{ background: {active_bg}; }}
         {palette_css}
         {tab_colors}
         .edge-window .note-tab, .edge-window .strip-control, .edge-search, .edge-search * {{ transition: none; animation: none; }}

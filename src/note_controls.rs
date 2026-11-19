@@ -76,7 +76,7 @@ impl NoteControls {
         let normal = gtk::Box::new(gtk::Orientation::Horizontal, s(8));
         pages.add_named(&normal, Some("settings"));
         root.append(&pages);
-        let color = menu("Color");
+        let color = menu("颜色");
         let color_dot = {
             let dot = gtk::Box::new(gtk::Orientation::Vertical, 0);
             dot.add_css_class("current-color-dot");
@@ -87,25 +87,25 @@ impl NoteControls {
             dot
         };
         let text = {
-            let button = menu("Font");
+            let button = menu("字体");
             button.set_label("Aa");
             button
         };
-        let checklist = appearance::toggle("checkbox-checked-symbolic", "Checklist");
+        let checklist = appearance::toggle("checkbox-checked-symbolic", "清单");
         checklist.set_child(Some(&ui_assets::image("checklist")));
         checklist.set_focus_on_click(false);
         let pin = appearance::toggle(
             "view-pin-symbolic",
             if surface == Surface::Preview {
-                "Pin note"
+                "置顶便签"
             } else {
-                "Always open"
+                "常开"
             },
         );
         pin.set_child(Some(&ui_assets::image("pin")));
-        let more = menu("More");
+        let more = menu("更多");
         more.set_child(Some(&ui_assets::image("more")));
-        let popout = (surface == Surface::Preview).then(|| ui_assets::icon("popout", "Pop out"));
+        let popout = (surface == Surface::Preview).then(|| ui_assets::icon("popout", "弹出为窗口"));
         for button in [&color, &text] {
             normal.append(button);
         }
@@ -125,9 +125,9 @@ impl NoteControls {
             size_row.add_css_class("text-controls");
             size_row.set_homogeneous(true);
             for (size, label, tooltip) in [
-                (NoteTextSize::Small, "S", "Small text"),
-                (NoteTextSize::Medium, "M", "Medium text"),
-                (NoteTextSize::Large, "L", "Large text"),
+                (NoteTextSize::Small, "S", "小号文字"),
+                (NoteTextSize::Medium, "M", "中号文字"),
+                (NoteTextSize::Large, "L", "大号文字"),
             ] {
                 let button = gtk::ToggleButton::with_label(label);
                 button.set_tooltip_text(Some(tooltip));
@@ -197,10 +197,10 @@ impl NoteControls {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         row.add_css_class("pattern-choices");
         for (paper, name) in [
-            (Paper::Plain, "Plain"),
-            (Paper::Dots, "Dots"),
-            (Paper::Grid, "Grid"),
-            (Paper::Ruled, "Ruled"),
+            (Paper::Plain, "纯色"),
+            (Paper::Dots, "圆点"),
+            (Paper::Grid, "网格"),
+            (Paper::Ruled, "横线"),
         ] {
             let button = gtk::ToggleButton::new();
             button.set_tooltip_text(Some(name));
@@ -217,8 +217,8 @@ impl NoteControls {
             let lists = gtk::Box::new(gtk::Orientation::Horizontal, 4);
             lists.add_css_class("list-choices");
             lists.set_homogeneous(true);
-            let bullets = ui_assets::icon("bullets", "Bullet list");
-            let numbers = ui_assets::icon("numbering", "Numbered list");
+            let bullets = ui_assets::icon("bullets", "项目符号列表");
+            let numbers = ui_assets::icon("numbering", "编号列表");
             bullets.remove_css_class("icon-control");
             numbers.remove_css_class("icon-control");
             lists.append(&bullets);
@@ -236,12 +236,10 @@ impl NoteControls {
                 action(icon, label, accessible)
             }
         };
-        let copy = command("copy", "Copy", "Copy text");
-        let archive =
-            (surface == Surface::Preview).then(|| command("archive", "Archive", "Archive note"));
-        let restore =
-            (surface == Surface::Preview).then(|| command("restore", "Restore", "Restore note"));
-        let delete = command("delete", "Delete", "Delete note");
+        let copy = command("copy", "复制", "复制文本");
+        let archive = (surface == Surface::Preview).then(|| command("archive", "归档", "归档便签"));
+        let restore = (surface == Surface::Preview).then(|| command("restore", "恢复", "恢复便签"));
+        let delete = command("delete", "删除", "删除便签");
         delete.add_css_class("delete-action");
         let actions = if surface == Surface::Preview {
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
@@ -261,7 +259,7 @@ impl NoteControls {
             button.set_visible(false);
         }
         if surface == Surface::Docked {
-            let button = action("popout", "Open away", "Open away from edge");
+            let button = action("popout", "独立窗口打开", "从边缘独立打开");
             commands.append(&button);
             separate = Some(button);
         }

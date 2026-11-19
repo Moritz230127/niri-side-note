@@ -97,9 +97,9 @@ impl PositionControls {
             button.set_active(config.edge == edge);
         }
         let labels = if matches!(config.edge, ScreenEdge::Top | ScreenEdge::Bottom) {
-            ["Left", "Center", "Right"]
+            ["左", "居中", "右"]
         } else {
-            ["Top", "Center", "Bottom"]
+            ["上", "居中", "下"]
         };
         for (index, button) in self.presets.iter().enumerate() {
             button.set_label(labels[index]);
@@ -133,19 +133,19 @@ impl PositionControls {
     ) -> Rc<Self> {
         let root = gtk::Box::new(gtk::Orientation::Vertical, 16);
         let screens = screen_choices(current.borrow().monitor.as_deref());
-        section(&root, "Screen", &screens.0);
-        let edges = choices(&["Left", "Right", "Top", "Bottom"], 0);
-        let presets = choices(&["Top", "Center", "Bottom"], 1);
-        section(&root, "Edge", &edges.0);
+        section(&root, "屏幕", &screens.0);
+        let edges = choices(&["左", "右", "上", "下"], 0);
+        let presets = choices(&["上", "居中", "下"], 1);
+        section(&root, "贴边位置", &edges.0);
         let position = gtk::Box::new(gtk::Orientation::Vertical, 10);
         position.append(&presets.0);
-        let move_button = gtk::Button::with_label("Reposition");
+        let move_button = gtk::Button::with_label("重新定位");
         move_button.set_halign(gtk::Align::Start);
         move_button.add_css_class("reposition-button");
         position.append(&move_button);
-        section(&root, "Position", &position);
-        let layouts = choices(&["Classic", "Stacked"], 1);
-        section(&root, "Tabs", &layouts.0);
+        section(&root, "位置", &position);
+        let layouts = choices(&["经典", "叠放"], 1);
+        section(&root, "标签样式", &layouts.0);
         let error = gtk::Label::new(None);
         error.set_wrap(true);
         error.set_max_width_chars(28);
@@ -264,9 +264,9 @@ pub fn build(
     let mut theme_buttons = Vec::new();
     let mut group: Option<gtk::ToggleButton> = None;
     for (theme, name) in [
-        (Theme::Minimal, "Minimal"),
-        (Theme::Paper, "Paper"),
-        (Theme::Playful, "Playful"),
+        (Theme::Minimal, "极简"),
+        (Theme::Paper, "纸张"),
+        (Theme::Playful, "活泼"),
     ] {
         let button = gtk::ToggleButton::new();
         button.add_css_class("theme-choice");
@@ -317,17 +317,17 @@ pub fn build(
         theme_buttons.push((button, theme));
     }
     let mode = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    let modes = choices(&["System", "Light", "Dark"], config.appearance as usize);
-    section(&mode, "Mode", &modes.0);
+    let modes = choices(&["跟随系统", "浅色", "深色"], config.appearance as usize);
+    section(&mode, "模式", &modes.0);
     mode.set_visible(config.theme == Theme::Minimal);
     root.append(&mode);
     let playful_row = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    let playful_edges = choices(&["Wavy", "Clean"], config.playful_edges as usize);
-    section(&playful_row, "Note edges", &playful_edges.0);
+    let playful_edges = choices(&["波浪", "平整"], config.playful_edges as usize);
+    section(&playful_row, "便签边缘", &playful_edges.0);
     playful_row.set_visible(config.theme == Theme::Playful);
     root.append(&playful_row);
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    let label = gtk::Label::new(Some("Reduce motion"));
+    let label = gtk::Label::new(Some("减少动画"));
     label.set_xalign(0.);
     label.set_hexpand(true);
     let switch = gtk::Switch::new();
@@ -425,11 +425,11 @@ pub fn build(
         .iter()
         .position(|seconds| *seconds == config.inactivity_seconds)
         .unwrap_or(2);
-    let timeouts = choices(&["Off", "1 min", "2 min", "5 min"], selected);
-    section(&root, "Auto-close", &timeouts.0);
+    let timeouts = choices(&["关闭", "1 分钟", "2 分钟", "5 分钟"], selected);
+    section(&root, "自动收起", &timeouts.0);
     timeouts
         .0
-        .set_tooltip_text(Some("Close docked notes after inactivity"));
+        .set_tooltip_text(Some("无操作后自动收起已展开的便签"));
     let timeouts = Rc::new(timeouts.1);
     for (index, button) in timeouts.iter().enumerate() {
         let current = current.clone();
@@ -457,12 +457,12 @@ pub fn build(
     let mut extras: Vec<Box<dyn Fn()>> = Vec::new();
     for (label, read, write) in [
         (
-            "Hover to reveal",
+            "悬停展开",
             (|c: &Config| c.edge_hover_enabled) as fn(&Config) -> bool,
             (|c: &mut Config, v| c.edge_hover_enabled = v) as fn(&mut Config, bool),
         ),
         (
-            "Launch at login",
+            "开机自启",
             |c: &Config| c.launch_at_login,
             |c: &mut Config, v| c.launch_at_login = v,
         ),
@@ -506,17 +506,18 @@ pub fn build(
         extras.push(Box::new(move || sync()));
     }
     root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-    let quit = gtk::Button::with_label("Quit Stickies");
+    let quit = gtk::Button::with_label("退出 Stickies");
     quit.add_css_class("reposition-button");
     quit.set_action_name(Some("app.quit"));
     root.append(&quit);
 
     root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-    let github = gtk::LinkButton::with_label("https://github.com/0atxl/stickies", "Star on GitHub");
+    let github =
+        gtk::LinkButton::with_label("https://github.com/0atxl/stickies", "在 GitHub 上点星");
     github.set_halign(gtk::Align::Center);
     github.add_css_class("github-footer");
     let link_content = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    link_content.append(&gtk::Label::new(Some("Star on GitHub")));
+    link_content.append(&gtk::Label::new(Some("在 GitHub 上点星")));
     link_content.append(&crate::ui_assets::image("popout"));
     github.set_child(Some(&link_content));
     root.append(&github);
@@ -593,7 +594,7 @@ fn screen_choices(current: Option<&str>) -> (gtk::Box, Vec<(gtk::ToggleButton, O
 
 fn section(root: &gtk::Box, name: &str, control: &impl IsA<gtk::Widget>) {
     // Give the four-way choices and position presets the drawer's full width.
-    let stacked = matches!(name, "Screen" | "Edge" | "Position" | "Auto-close");
+    let stacked = matches!(name, "屏幕" | "贴边位置" | "位置" | "自动收起");
     let box_ = gtk::Box::new(
         if stacked {
             gtk::Orientation::Vertical

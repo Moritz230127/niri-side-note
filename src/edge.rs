@@ -541,7 +541,7 @@ impl Strip {
         search_panel.add_css_class("edge-search");
         search_panel.set_width_request(s(224));
         let edge_search = gtk::SearchEntry::new();
-        edge_search.set_placeholder_text(Some("Search active notes"));
+        edge_search.set_placeholder_text(Some("搜索现有便签"));
         edge_search.set_hexpand(true);
         search_panel.append(&edge_search);
         let search_results = gtk::ListBox::new();
@@ -559,7 +559,7 @@ impl Strip {
         let search_content = gtk::Overlay::new();
         search_content.set_child(Some(&scroll));
         search_panel.append(&search_content);
-        let search_create = gtk::Button::with_label("No active notes");
+        let search_create = gtk::Button::with_label("没有现有便签");
         search_create.add_css_class("edge-create-result");
         search_create.set_valign(gtk::Align::Start);
         search_content.add_overlay(&search_create);
@@ -584,7 +584,7 @@ impl Strip {
         let reposition_panel = gtk::Box::new(gtk::Orientation::Vertical, s(12));
         reposition_panel.add_css_class("edge-search");
         reposition_panel.set_width_request(s(240));
-        let instruction = gtk::Label::new(Some("Drag the strip along the edge."));
+        let instruction = gtk::Label::new(Some("沿屏幕边缘拖动便签条。"));
         instruction.set_wrap(true);
         reposition_panel.append(&instruction);
         let reposition_error = gtk::Label::new(None);
@@ -594,8 +594,8 @@ impl Strip {
         reposition_error.set_visible(false);
         reposition_panel.append(&reposition_error);
         let actions = gtk::Box::new(gtk::Orientation::Horizontal, s(8));
-        let cancel_reposition = gtk::Button::with_label("Cancel");
-        let done_reposition = gtk::Button::with_label("Done");
+        let cancel_reposition = gtk::Button::with_label("取消");
+        let done_reposition = gtk::Button::with_label("完成");
         for button in [&cancel_reposition, &done_reposition] {
             button.set_hexpand(true);
             actions.append(button);
@@ -612,8 +612,8 @@ impl Strip {
         delete_toast.add_css_class("edge-delete-toast");
         delete_toast.set_halign(gtk::Align::Start);
         delete_toast.set_valign(gtk::Align::Start);
-        delete_toast.append(&gtk::Label::new(Some("Note deleted")));
-        let undo_delete = gtk::Button::with_label("Undo");
+        delete_toast.append(&gtk::Label::new(Some("便签已删除")));
+        let undo_delete = gtk::Button::with_label("撤销");
         delete_toast.append(&undo_delete);
         delete_toast.set_visible(false);
         delete_toast.set_opacity(0.);
@@ -1505,7 +1505,7 @@ impl Ui {
                         ui.finish_change(id, crate::manager::ManagerChange::Restore);
                         ui.hide_delete_toast();
                     }
-                    Err(error) => ui.error(&format!("Could not undo deletion: {error}")),
+                    Err(error) => ui.error(&format!("无法撤销删除：{error}")),
                 }
             }
         });
@@ -1756,7 +1756,7 @@ impl Ui {
                         let mut config = ui.config.borrow().clone();
                         config.marker_offset = ui.dragged_offset(start, x, y);
                         if let Err(error) = ui.change_settings(config) {
-                            ui.error(&format!("Could not save position: {error}"));
+                            ui.error(&format!("无法保存位置：{error}"));
                         }
                     }
                 }
@@ -1960,7 +1960,7 @@ impl Ui {
         {
             Ok(notes) => notes,
             Err(error) => {
-                self.error(&format!("Could not load edge notes: {error}"));
+                self.error(&format!("无法加载贴边便签：{error}"));
                 return;
             }
         };
@@ -1976,7 +1976,7 @@ impl Ui {
         self.edge.tabs.set_orientation(orientation);
         self.edge.marker.set_orientation(orientation);
         let s = crate::edge_surface::scale_px;
-        let depth = s(24);
+        let depth = s(26);
         // Measure the upright titles, but cap their contribution so a long title
         // cannot widen the whole strip. Both orientations use a slim 24px depth.
         // Fixed tab length. The group starts centered and grows toward both
@@ -2030,13 +2030,19 @@ impl Ui {
                 (notes.len() as i32 * (tab_height + gap) - gap + inset).max(0)
             },
         );
+        let active = self.edge.state().docked_id();
         for (index, note) in notes.iter().enumerate() {
+            let is_active = active == Some(note.id);
             let tab = gtk::Button::new();
             tab.add_css_class("note-tab");
+            if is_active {
+                tab.add_css_class("active");
+            }
+            tab.set_opacity(if is_active { 1.0 } else { 0.8 });
             tab.set_widget_name(&format!("note-{:?}", note.id));
             appearance::set_color(&tab, note.color);
             let title = if note.title.trim().is_empty() {
-                "Untitled note"
+                "无标题便签"
             } else {
                 &note.title
             };
@@ -2087,46 +2093,28 @@ impl Ui {
             let overlay = gtk::Overlay::new();
             overlay.set_child(Some(&content));
             let accent = gtk::Box::new(gtk::Orientation::Vertical, 0);
-            accent.add_css_class("edge-color-bar");
+            accent.add_css_class("edge-accent-line");
             accent.set_can_target(false);
             appearance::set_color(&accent, note.color);
+            accent.set_opacity(if is_active { 1.0 } else { 0.55 });
             if horizontal {
-                accent.set_size_request(-1, s(6));
+                accent.set_size_request(-1, s(3));
                 accent.set_hexpand(true);
                 accent.set_valign(if config.edge == ScreenEdge::Top {
-                    gtk::Align::Start
-                } else {
                     gtk::Align::End
+                } else {
+                    gtk::Align::Start
                 });
             } else {
-                accent.set_size_request(s(6), -1);
+                accent.set_size_request(s(3), -1);
                 accent.set_vexpand(true);
                 accent.set_halign(if config.edge == ScreenEdge::Right {
-                    gtk::Align::End
-                } else {
                     gtk::Align::Start
+                } else {
+                    gtk::Align::End
                 });
             }
             overlay.add_overlay(&accent);
-            let initial = title
-                .chars()
-                .next()
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| "?".into());
-            let badge = gtk::Label::new(Some(&initial));
-            badge.add_css_class("tab-badge");
-            appearance::set_color(&badge, note.color);
-            badge.set_size_request(s(20), s(20));
-            badge.set_halign(gtk::Align::Center);
-            if horizontal {
-                badge.set_halign(gtk::Align::Start);
-                badge.set_valign(gtk::Align::Center);
-                badge.set_margin_start(s(3));
-            } else {
-                badge.set_valign(gtk::Align::Start);
-                badge.set_margin_top(s(3));
-            }
-            overlay.add_overlay(&badge);
             tab.set_child(Some(&overlay));
             let extension = if config.tab_layout == config::TabLayout::Classic {
                 s(6)
@@ -2265,9 +2253,9 @@ impl Ui {
         // GTK has no CSS overflow property. Clip utility feedback to the capsule.
         utilities.set_overflow(gtk::Overflow::Hidden);
         for (name, label) in [
-            ("plus", "New note"),
-            ("search", "Search notes"),
-            ("grid", "All Notes"),
+            ("plus", "新建便签"),
+            ("search", "搜索便签"),
+            ("grid", "全部便签"),
         ] {
             let button = ui_assets::edge_icon(name, label);
             button.set_widget_name(name);
@@ -2411,7 +2399,7 @@ impl Ui {
         ) {
             Ok(notes) => notes,
             Err(e) => {
-                self.error(&format!("Could not search notes: {e}"));
+                self.error(&format!("无法搜索便签：{e}"));
                 return;
             }
         };
@@ -2433,7 +2421,7 @@ impl Ui {
             dot.set_valign(gtk::Align::Center);
             appearance::set_color(&dot, note.color);
             let title = gtk::Label::new(Some(if note.title.trim().is_empty() {
-                "Untitled note"
+                "无标题便签"
             } else {
                 &note.title
             }));
@@ -2464,9 +2452,9 @@ impl Ui {
         self.edge
             .search_create
             .set_label(if query.trim().is_empty() {
-                "No active notes"
+                "没有现有便签"
             } else {
-                "No matches. Create note"
+                "无匹配，创建便签"
             });
         self.edge.search_size_dirty.set(true);
         self.queue_edge_layout();
@@ -2590,18 +2578,16 @@ impl Ui {
 
     pub(super) fn begin_reposition(self: &Rc<Self>) -> Result<(), String> {
         if !self.config_valid {
-            return Err("Correct the invalid configuration before repositioning.".into());
+            return Err("配置无效，修正后才能重新定位。".into());
         }
         if self.config.borrow().hide_in_dnd && self.dnd.get() {
-            return Err("Turn off Do Not Disturb before repositioning the strip.".into());
+            return Err("请先关闭“勿扰模式”，再重新定位便签条。".into());
         }
         if self.edge.state().is_repositioning() {
             return Ok(());
         }
         if !self.close_docked() {
-            return Err(
-                "The open note could not be saved. Retry saving it before repositioning.".into(),
-            );
+            return Err("当前便签未能保存，请重试后再重新定位。".into());
         }
         self.close_edge_search();
         self.edge
@@ -2634,7 +2620,7 @@ impl Ui {
             let mut config = self.config.borrow().clone();
             config.marker_offset = offset;
             if let Err(error) = config.save(&config::config_path()) {
-                let message = format!("Could not save position: {error}");
+                let message = format!("无法保存位置：{error}");
                 self.edge.reposition_error.set_text(&message);
                 self.edge.reposition_error.set_visible(true);
                 self.place_edge();

@@ -148,7 +148,7 @@ impl ManagerUi {
                 }
             }
             Err(error) => {
-                self.message(&format!("Could not load notes: {error}"));
+                self.message(&format!("无法加载便签：{error}"));
                 self.busy.set(false);
                 return;
             }
@@ -169,7 +169,7 @@ impl ManagerUi {
             {
                 Ok(notes) => notes,
                 Err(e) => {
-                    self.message(&format!("Could not load notes: {e}"));
+                    self.message(&format!("无法加载便签：{e}"));
                     self.busy.set(false);
                     return;
                 }
@@ -240,7 +240,7 @@ impl ManagerUi {
         let archived = match self.storage.is_archived(id) {
             Ok(value) => value,
             Err(e) => {
-                self.message(&format!("Could not load note: {e}"));
+                self.message(&format!("无法加载便签：{e}"));
                 return;
             }
         };
@@ -253,7 +253,7 @@ impl ManagerUi {
                 .cloned()
                 .or_else(|| self.storage.load_note(id).ok());
             let Some(note) = note else {
-                self.message("Could not load note");
+                self.message("无法加载便签");
                 return;
             };
             self.subscription.borrow_mut().take();
@@ -321,37 +321,37 @@ impl ManagerUi {
         let searching = !self.search.text().is_empty();
         let archived = self.collection.get() == NoteCollection::Archived;
         self.empty_title.set_text(if has_notes {
-            "Choose a note"
+            "选择一条便签"
         } else if searching {
-            "No matching notes"
+            "没有匹配的便签"
         } else if archived {
-            "Archive is empty"
+            "归档为空"
         } else if !self.has_saved_notes.get() {
-            "Welcome to Stickies"
+            "欢迎使用 Stickies"
         } else {
-            "No active notes"
+            "没有现有便签"
         });
         self.empty_text.set_text(if has_notes {
-            "Select a note from the list to view or edit it."
+            "从列表中选择一条便签查看或编辑。"
         } else if searching {
-            "Try another word or clear your search."
+            "换个关键词，或清除搜索。"
         } else if archived {
-            "Notes you archive will appear here."
+            "归档的便签会显示在这里。"
         } else if !self.has_saved_notes.get() {
             "Create your first note.\nClick the edge marker to reach your notes anytime."
         } else {
-            "Create a note or switch to All to see your archived notes."
+            "新建便签，或切换到“全部”查看归档。"
         });
         self.empty_action.set_label(if has_notes {
-            "Create a note"
+            "新建便签"
         } else if searching {
-            "Clear search"
+            "清除搜索"
         } else if archived {
-            "Back to notes"
+            "返回便签"
         } else if !self.has_saved_notes.get() {
-            "Create your first note"
+            "创建第一条便签"
         } else {
-            "Create a note"
+            "新建便签"
         });
         self.pages.set_visible_child_name("empty");
     }
@@ -391,9 +391,9 @@ impl ManagerUi {
             self.color.set(session.color());
             self.pin.set_active(session.pinned());
             self.pin.set_tooltip_text(Some(if session.pinned() {
-                "Unpin note"
+                "取消置顶"
             } else {
-                "Pin note"
+                "置顶便签"
             }));
             let error = session.error();
             let error_key = error.clone().map(|message| (session.id(), message));
@@ -411,7 +411,7 @@ impl ManagerUi {
                 }
             }
             self.save_state
-                .set_text(if error.is_some() { "Save failed" } else { "" });
+                .set_text(if error.is_some() { "保存失败" } else { "" });
             if error.is_some() {
                 self.save_state.add_css_class("error");
             } else {
@@ -427,11 +427,11 @@ impl ManagerUi {
                 });
             self.save_indicator
                 .set_tooltip_text(Some(if error.is_some() {
-                    "Could not save note"
+                    "无法保存便签"
                 } else if session.is_dirty() {
-                    "Saving"
+                    "保存中"
                 } else {
-                    "Saved"
+                    "已保存"
                 }));
             if !defaults.reduced_motion
                 && gtk::Settings::default().is_some_and(|s| s.is_gtk_enable_animations())
@@ -466,7 +466,7 @@ impl ManagerUi {
                     }
                     let live_title = session.title.text();
                     title.set_text(if live_title.is_empty() {
-                        "Untitled note"
+                        "无标题便签"
                     } else {
                         live_title.as_str()
                     });
@@ -490,11 +490,11 @@ impl ManagerUi {
             if let Some(note) = self.notes.borrow().iter().find(|n| n.id == id) {
                 self.color.set(note.color);
             }
-            self.save_state.set_text("Archived · restore to edit");
+            self.save_state.set_text("已归档 · 恢复后可编辑");
             self.save_state.remove_css_class("error");
             self.save_indicator.set_visible_child_name("error");
             self.save_indicator
-                .set_tooltip_text(Some("Restore this note to edit it"));
+                .set_tooltip_text(Some("恢复此便签后才能编辑"));
         }
         self.syncing_style.set(true);
         self.controls.sync(&style, self.color.get(), defaults.theme);
@@ -522,12 +522,12 @@ impl ManagerUi {
             let date = |millis| {
                 gtk::glib::DateTime::from_unix_local(millis / 1000)
                     .ok()
-                    .and_then(|d| d.format("%d %b · %H:%M").ok())
+                    .and_then(|d| d.format("%-m月%-d日 · %H:%M").ok())
                     .map(|s| s.to_string())
                     .unwrap_or_default()
             };
             self.dates.set_text(&format!(
-                "Created {}   ·   Updated {}",
+                "创建 {}   ·   更新 {}",
                 date(created),
                 date(updated)
             ));
@@ -555,7 +555,7 @@ impl ManagerUi {
                 if let Some(session) = self.session.borrow().as_ref() {
                     session.attach_view(&self.body);
                 }
-                self.message(&format!("Could not create note: {e}"));
+                self.message(&format!("无法新建便签：{e}"));
             }
         }
     }
@@ -581,7 +581,7 @@ impl ManagerUi {
             self.sync_editor();
             // Live pin failures are already reported by the shared session.
             if change != ManagerChange::Pin || self.session.borrow().is_none() {
-                self.message(&format!("Could not update note: {e}"));
+                self.message(&format!("无法更新便签：{e}"));
             }
             return;
         }
@@ -597,15 +597,15 @@ impl ManagerUi {
             // Native action toasts have a hard-coded 450px natural width.
             // A custom title keeps the native toast lifecycle at content width.
             let content = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-            let label = gtk::Label::new(Some("Note deleted"));
+            let label = gtk::Label::new(Some("便签已删除"));
             label.add_css_class("heading");
-            let undo = gtk::Button::with_label("Undo");
+            let undo = gtk::Button::with_label("撤销");
             undo.add_css_class("flat");
             undo.set_focus_on_click(false);
             content.append(&label);
             content.append(&undo);
             let toast = adw::Toast::builder()
-                .title("Note deleted")
+                .title("便签已删除")
                 .custom_title(&content)
                 .timeout(6)
                 .build();
@@ -619,7 +619,7 @@ impl ManagerUi {
                             (ui.callbacks.changed)(id, ManagerChange::Restore);
                             ui.refresh(Some(id));
                         }
-                        Err(e) => ui.message(&format!("Could not undo deletion: {e}")),
+                        Err(e) => ui.message(&format!("无法撤销删除：{e}")),
                     }
                 }
             });
@@ -660,7 +660,7 @@ pub fn build_window(
     );
     let window = adw::ApplicationWindow::builder()
         .application(application)
-        .title("All Notes")
+        .title("全部便签")
         .default_width(s(720))
         .default_height(s(500))
         .width_request(s(680))
@@ -673,13 +673,13 @@ pub fn build_window(
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let header = gtk::Box::new(gtk::Orientation::Horizontal, s(8));
     header.add_css_class("main-header");
-    let heading = gtk::Label::new(Some("All Notes"));
+    let heading = gtk::Label::new(Some("全部便签"));
     heading.add_css_class("panel-title");
     heading.set_xalign(0.);
     heading.set_width_request(s(112));
     let search = gtk::SearchEntry::new();
     search.add_css_class("search-field");
-    search.set_placeholder_text(Some("Search notes"));
+    search.set_placeholder_text(Some("搜索便签"));
     search.set_hexpand(true);
     let search_clamp = adw::Clamp::builder()
         .valign(gtk::Align::Center)
@@ -687,21 +687,21 @@ pub fn build_window(
         .child(&search)
         .hexpand(true)
         .build();
-    let new = ui_assets::icon("plus", "New note");
-    let sort_button = menu_button("sort", "Sort notes");
-    let recent = gtk::Button::with_label("Recently edited");
-    let alphabetical = gtk::Button::with_label("Title");
+    let new = ui_assets::icon("plus", "新建便签");
+    let sort_button = menu_button("sort", "排序方式");
+    let recent = gtk::Button::with_label("最近编辑");
+    let alphabetical = gtk::Button::with_label("标题");
     set_menu(&sort_button, &[&recent, &alphabetical]);
     let filters: Vec<_> = [
-        ("All", NoteCollection::All),
-        ("Active", NoteCollection::Active),
-        ("Archived", NoteCollection::Archived),
+        ("全部", NoteCollection::All),
+        ("现有", NoteCollection::Active),
+        ("已归档", NoteCollection::Archived),
     ]
     .into_iter()
     .map(|(label, collection)| (gtk::Button::with_label(label), collection))
     .collect();
-    let settings = ui_assets::icon("settings", "Settings");
-    let close = ui_assets::icon("close", "Close All Notes");
+    let settings = ui_assets::icon("settings", "设置");
+    let close = ui_assets::icon("close", "关闭全部便签");
     header.append(&heading);
     header.append(&search_clamp);
     for widget in [
@@ -752,7 +752,7 @@ pub fn build_window(
     paper_content.add_css_class("inline-content");
     let title = gtk::Entry::new();
     title.add_css_class("inline-title");
-    title.set_placeholder_text(Some("Untitled note"));
+    title.set_placeholder_text(Some("无标题便签"));
     title.set_width_chars(8);
     title.set_hexpand(true);
     let body = crate::note_text::view(None);
@@ -865,7 +865,7 @@ pub fn build_window(
     let appearance_header = gtk::Box::new(gtk::Orientation::Horizontal, s(8));
     appearance_header.add_css_class("appearance-header");
     appearance_header.set_height_request(s(44));
-    let appearance_title = gtk::Label::new(Some("Settings"));
+    let appearance_title = gtk::Label::new(Some("设置"));
     appearance_title.set_xalign(0.);
     appearance_title.set_hexpand(true);
     appearance_header.append(&appearance_title);
@@ -1269,7 +1269,7 @@ fn note_row(note: &Note, archived: bool, updated: Option<i64>) -> gtk::ListBoxRo
     text.set_valign(gtk::Align::Center);
     text.set_hexpand(true);
     let title = gtk::Label::new(Some(if note.title.is_empty() {
-        "Untitled note"
+        "无标题便签"
     } else {
         &note.title
     }));
@@ -1296,7 +1296,7 @@ fn note_row(note: &Note, archived: bool, updated: Option<i64>) -> gtk::ListBoxRo
         heading.append(&badge);
     }
     let pin = ui_assets::image("pin");
-    pin.set_tooltip_text(Some("Pinned"));
+    pin.set_tooltip_text(Some("已置顶"));
     pin.set_visible(note.pinned);
     heading.append(&pin);
     text.append(&heading);
@@ -1309,7 +1309,7 @@ fn note_row(note: &Note, archived: bool, updated: Option<i64>) -> gtk::ListBoxRo
 fn short_date(millis: Option<i64>) -> String {
     millis
         .and_then(|ms| gtk::glib::DateTime::from_unix_local(ms / 1000).ok())
-        .and_then(|date| date.format("%b %-d").ok())
+        .and_then(|date| date.format("%-m月%-d日").ok())
         .map(|date| date.to_string())
         .unwrap_or_default()
 }

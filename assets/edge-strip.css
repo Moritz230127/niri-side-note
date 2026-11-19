@@ -6,7 +6,7 @@
  * Motion is handled in Rust.
  */
 /* ---- shared ---- */
-.edge-window .tab-title { font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; } /* letter-spacing optional: delete if GTK warns */
+.edge-window .tab-title { font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; } /* letter-spacing optional: delete if GTK warns */
 .edge-window .edge-utilities { padding: 0; /* Clipped with GtkWidget::set_overflow(Hidden). */ }
 .edge-window .strip-control { background: transparent; border: none; border-radius: 0; padding: 0; min-width: 24px; min-height: 24px; box-shadow: none; }
 /* Hover/press feedback comes from motion; keep the fill clear. */
@@ -193,16 +193,8 @@
 .edge-window .edge-delete-toast button { background: transparent; color: inherit; border: none; box-shadow: none; padding: 4px 6px; min-height: 22px; border-radius: 5px; font-size: 13px; }
 
 .edge-window .edge-marker .marker-pill { min-width: 0; min-height: 0; border-radius: 3px; box-shadow: none; }
-/* Persistent identity chip on overlapping tabs: colour + first character. */
-.edge-window .tab-badge {
-  font-family: Inter, sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: 5px;
-  min-width: 18px;
-  min-height: 18px;
-  padding: 0;
-}
+/* Thin inner accent keeps document tabs recognisable without heavy chrome. */
+.edge-window .edge-accent-line { border-radius: 2px; }
 .edge-window .edge-marker .marker-pill:not(.edge-result-color) { background: #88847d; }
 
 /* Classic reveals one continuous tab from off screen; no shadow seam. */

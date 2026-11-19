@@ -105,7 +105,7 @@ impl Editor {
         title.add_css_class("editor-title");
         title.set_hexpand(true);
         title.set_width_chars(1);
-        title.set_placeholder_text(Some("Untitled note"));
+        title.set_placeholder_text(Some("无标题便签"));
         title.set_buffer(&session.title);
         // An idle title reads from the beginning, even after narrowing the note
         // or updating its shared buffer from another editor.
@@ -128,7 +128,7 @@ impl Editor {
         session.attach_title(&title);
         let weak_session = Rc::downgrade(&session);
         crate::text_editing::bind_title_history(&title, move || weak_session.upgrade());
-        let close = ui_assets::icon("close", "Close note");
+        let close = ui_assets::icon("close", "关闭便签");
         header.append(&title);
         header.append(&close);
         let body = crate::note_text::view(Some(&session.body));
@@ -197,8 +197,8 @@ impl Editor {
             handle.set_margin_top(s(9));
             handle.set_size_request(s(40), s(14));
             handle.set_cursor_from_name(Some("grab"));
-            handle.set_tooltip_text(Some("Drag to move note"));
-            handle.update_property(&[gtk::accessible::Property::Label("Drag to move note")]);
+            handle.set_tooltip_text(Some("拖动以移动便签"));
+            handle.update_property(&[gtk::accessible::Property::Label("拖动以移动便签")]);
             let grip = gtk::Box::new(gtk::Orientation::Horizontal, 0);
             grip.add_css_class("note-drag-grip");
             grip.set_can_target(false);

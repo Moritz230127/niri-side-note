@@ -1,10 +1,10 @@
 use gtk::{gio, glib, prelude::*};
 
 pub const ACTIONS: [(&str, &str); 4] = [
-    ("new-note", "New note"),
-    ("search", "Search notes"),
-    ("toggle-strip", "Toggle edge strip"),
-    ("show-all-notes", "All Notes"),
+    ("new-note", "新建便签"),
+    ("search", "搜索便签"),
+    ("toggle-strip", "展开/收起贴边条"),
+    ("show-all-notes", "全部便签"),
 ];
 
 pub fn add_options(application: &gio::Application) {
@@ -27,7 +27,7 @@ pub fn requested_action(options: &glib::VariantDict) -> Result<Option<&'static s
         .filter(|name| options.contains(name));
     let action = actions.next();
     if actions.next().is_some() {
-        return Err("Use only one action flag per invocation.");
+        return Err("一次只能使用一个操作参数。");
     }
     Ok(action)
 }
@@ -85,7 +85,7 @@ mod tests {
                 parse(&["stickies", "--new-note", "--search"]),
                 (
                     glib::ExitCode::FAILURE,
-                    Some(Err("Use only one action flag per invocation."))
+                    Some(Err("一次只能使用一个操作参数。"))
                 )
             );
             assert_eq!(
@@ -120,7 +120,7 @@ mod tests {
             combined.insert("search", true);
             assert_eq!(
                 requested_action(&combined),
-                Err("Use only one action flag per invocation.")
+                Err("一次只能使用一个操作参数。")
             );
         }
     }
