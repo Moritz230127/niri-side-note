@@ -13,6 +13,7 @@ mod edge;
 mod edge_surface;
 mod edit_history;
 mod editor;
+mod i18n;
 mod manager;
 mod motion;
 mod note_controls;
@@ -769,6 +770,7 @@ fn main() -> glib::ExitCode {
                 return;
             }
             build(application, &pending);
+            i18n::install();
         }
     });
     application.connect_command_line(move |application, command_line| {

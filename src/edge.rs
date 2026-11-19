@@ -202,7 +202,7 @@ struct Policy {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum StripInput {
-    Marker,
+    Edge,
     Tabs,
 }
 
@@ -251,7 +251,7 @@ fn transition(state: EdgeState, event: EdgeEvent, policy: Policy) -> (EdgeState,
         Layer::Overlay
     };
     let mut effects = Effects {
-        marker_visible: state == State::Dormant,
+        marker_visible: false,
         tabs_visible: state.is_revealed(),
         panel,
         pointer_visible: matches!(state, State::Search | State::Docked(_)),
@@ -268,7 +268,7 @@ fn transition(state: EdgeState, event: EdgeEvent, policy: Policy) -> (EdgeState,
             KeyboardMode::None
         },
         strip_input: if state == State::Dormant {
-            StripInput::Marker
+            StripInput::Edge
         } else {
             StripInput::Tabs
         },
@@ -671,7 +671,7 @@ impl Strip {
     }
     fn apply(&self, effects: Effects) {
         let moving = self.strip_phase.get() != StripPhase::Settled;
-        self.marker.set_visible(effects.marker_visible || moving);
+        self.marker.set_visible(false);
         self.tabs.set_visible(effects.tabs_visible || moving);
         if let Some(panel) = effects.panel {
             self.stack.set_visible_child_name(panel);
@@ -1055,7 +1055,7 @@ impl Ui {
         }
         self.edge.strip_motion.jump(progress);
         self.paint_strip(progress);
-        self.edge.marker.set_visible(!revealed);
+        self.edge.marker.set_visible(false);
         self.edge.tabs.set_visible(revealed);
         if !revealed {
             self.edge.strip_bounds.set(self.edge.marker_bounds.get());
@@ -1956,7 +1956,7 @@ impl Ui {
                 .max()
                 .unwrap_or(0);
             let (screen_width, _) = self.note_limits();
-            let count = config.visible_notes as i32;
+            let count = notes.len().max(1) as i32;
             let reserved = (count - 1) * tab_gap(&config)
                 + 2 * TAB_INSET
                 + self.edge.tabs.spacing()
@@ -1980,18 +1980,13 @@ impl Ui {
             depth
         } else {
             let (_, screen_height) = self.note_limits();
-            let count = config.visible_notes as i32;
+            let count = notes.len().max(1) as i32;
             let reserved = (count - 1) * tab_gap(&config)
                 + 2 * TAB_INSET
                 + self.edge.tabs.spacing()
                 + 3 * depth
                 + 2 * motion::HOVER_PAD;
-            let maximum = if config.tab_layout == config::TabLayout::Classic {
-                s(104)
-            } else {
-                s(80)
-            };
-            ((screen_height - reserved) / count).clamp(depth, maximum)
+            ((screen_height - reserved) / count).max(depth)
         };
         let fixed = glib::Object::new::<TabLayout>().upcast::<gtk::Fixed>();
         fixed
@@ -2107,40 +2102,6 @@ impl Ui {
                     ui.open_docked(id);
                 }
             });
-        }
-        self.edge
-            .marker
-            .set_spacing(if config.marker_style == config::MarkerStyle::Dots {
-                s(5)
-            } else {
-                0
-            });
-        match config.marker_style {
-            config::MarkerStyle::Bar => {
-                let line = gtk::Box::new(orientation, 0);
-                line.add_css_class("marker-line");
-                line.set_size_request(
-                    if horizontal { s(40) } else { s(4) },
-                    if horizontal { s(4) } else { s(40) },
-                );
-                self.edge.marker.append(&line);
-            }
-            config::MarkerStyle::Dots => {
-                // One pill per visible saved note; the empty strip keeps one neutral pill.
-                for index in 0..notes.len().max(1) {
-                    let dot = gtk::Box::new(orientation, 0);
-                    dot.add_css_class("marker-pill");
-                    dot.set_size_request(
-                        if horizontal { s(14) } else { s(5) },
-                        if horizontal { s(5) } else { s(14) },
-                    );
-                    if let Some(note) = notes.get(index) {
-                        dot.add_css_class("edge-result-color");
-                        appearance::set_color(&dot, note.color);
-                    }
-                    self.edge.marker.append(&dot);
-                }
-            }
         }
         {
             let motion = gtk::EventControllerMotion::new();
@@ -2780,34 +2741,33 @@ impl Ui {
         };
         // Measure without placement margins, which otherwise feed back into size.
         position(self.edge.tabs.upcast_ref(), tx, ty);
-        let (mw, mh) = measure(self.edge.marker.upcast_ref());
-        let (mx, my) = match config.edge {
-            ScreenEdge::Left => (
-                0,
-                (offset + (th - mh) / 2).clamp(0, (screen_height - mh).max(0)),
-            ),
+        // Dormant state has no visible trigger. The whole screen edge is the
+        // hover/click target, so keep a full-length strip of input there.
+        let trigger_depth = crate::edge_surface::scale_px(12);
+        let trigger = match config.edge {
+            ScreenEdge::Left => (0, 0, trigger_depth, screen_height),
             ScreenEdge::Right => (
-                screen_width - mw,
-                (offset + (th - mh) / 2).clamp(0, (screen_height - mh).max(0)),
-            ),
-            ScreenEdge::Top => (
-                (offset + (tw - mw) / 2).clamp(0, (screen_width - mw).max(0)),
+                screen_width - trigger_depth,
                 0,
+                trigger_depth,
+                screen_height,
             ),
+            ScreenEdge::Top => (0, 0, screen_width, trigger_depth),
             ScreenEdge::Bottom => (
-                (offset + (tw - mw) / 2).clamp(0, (screen_width - mw).max(0)),
-                screen_height - mh,
+                0,
+                screen_height - trigger_depth,
+                screen_width,
+                trigger_depth,
             ),
         };
-        position(self.edge.marker.upcast_ref(), mx, my);
-        self.edge.marker_bounds.set((mx, my, mw, mh));
+        self.edge.marker_bounds.set(trigger);
         self.edge.strip_bounds.set(
             if effects.strip_input == StripInput::Tabs
                 || self.edge.strip_phase.get() == StripPhase::Collapsing
             {
                 (tx, ty, tw, th)
             } else {
-                (mx, my, mw, mh)
+                trigger
             },
         );
         let docked = self.edge.docked.borrow();
@@ -3429,8 +3389,8 @@ mod tests {
         assert_eq!(effects.panel, None);
         let (state, effects) = transition(state, EdgeEvent::Collapse, policy());
         assert_eq!(state, EdgeState::Dormant);
-        assert!(effects.marker_visible && !effects.tabs_visible);
-        assert_eq!(effects.strip_input, StripInput::Marker);
+        assert!(!effects.marker_visible && !effects.tabs_visible);
+        assert_eq!(effects.strip_input, StripInput::Edge);
         assert!(!effects.panel_input && !effects.pointer_visible);
         assert_eq!(effects.strip_keyboard, KeyboardMode::None);
         assert_eq!(effects.window_keyboard, KeyboardMode::None);
@@ -3472,7 +3432,7 @@ mod tests {
             );
             let (state, effects) = transition(state, EdgeEvent::FinishReposition, policy());
             assert_eq!(state, EdgeState::Dormant);
-            assert!(effects.marker_visible);
+            assert!(!effects.marker_visible);
             assert!(!effects.tabs_visible && !effects.panel_input);
         }
     }

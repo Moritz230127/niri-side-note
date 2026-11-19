@@ -73,17 +73,68 @@ pub fn configure_display_dpi() {}
 
 #[cfg(target_os = "linux")]
 pub fn ui_scale() -> f64 {
-    1.0
+    use gtk::prelude::*;
+    let Some(display) = gtk::gdk::Display::default() else {
+        return 1.0;
+    };
+    let max_height = display
+        .monitors()
+        .iter::<gtk::gdk::Monitor>()
+        .filter_map(Result::ok)
+        .map(|monitor| monitor.geometry().height())
+        .max()
+        .unwrap_or(0);
+    if max_height <= 0 {
+        return 1.0;
+    }
+    (f64::from(max_height) / 960.0).clamp(1.0, 1.75)
 }
 
 #[cfg(target_os = "linux")]
 pub fn scale_px(px: i32) -> i32 {
-    px
+    let scale = ui_scale();
+    if px == 0 || (scale - 1.0).abs() < 0.05 {
+        return px;
+    }
+    (f64::from(px) * scale).round() as i32
 }
 
 #[cfg(target_os = "linux")]
 pub fn scale_css(css: &str) -> String {
-    css.to_owned()
+    let scale = ui_scale();
+    if (scale - 1.0).abs() < 0.05 {
+        return css.to_owned();
+    }
+    // Scale every integer/decimal `px` token in the stylesheet. The bundled
+    // CSS is ASCII, so byte-wise scanning is safe and avoids a regex dependency.
+    let bytes = css.as_bytes();
+    let mut out = String::with_capacity(css.len() + 16);
+    let mut index = 0;
+    while index < bytes.len() {
+        let start = index;
+        if bytes[index].is_ascii_digit()
+            || (bytes[index] == b'.'
+                && index + 1 < bytes.len()
+                && bytes[index + 1].is_ascii_digit())
+        {
+            index += 1;
+            while index < bytes.len() && (bytes[index].is_ascii_digit() || bytes[index] == b'.') {
+                index += 1;
+            }
+            if index + 1 < bytes.len() && bytes[index] == b'p' && bytes[index + 1] == b'x' {
+                let value: f64 = css[start..index].parse().unwrap_or(0.);
+                out.push_str(&((value * scale).round() as i32).to_string());
+                out.push_str("px");
+                index += 2;
+            } else {
+                out.push_str(&css[start..index]);
+            }
+            continue;
+        }
+        out.push(char::from(bytes[index]));
+        index += 1;
+    }
+    out
 }
 
 #[cfg(target_os = "windows")]

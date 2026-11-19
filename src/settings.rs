@@ -1,7 +1,7 @@
 use crate::{
     app::NoteColor,
     appearance,
-    config::{Appearance, Config, MarkerStyle, PlayfulEdges, ScreenEdge, Shape, TabLayout, Theme},
+    config::{Appearance, Config, PlayfulEdges, ScreenEdge, Shape, TabLayout, Theme},
 };
 use gtk::prelude::*;
 use std::{
@@ -80,7 +80,6 @@ struct PositionControls {
     presets: Vec<gtk::ToggleButton>,
     counts: Vec<gtk::ToggleButton>,
     layouts: Vec<gtk::ToggleButton>,
-    markers: Vec<gtk::ToggleButton>,
     error: gtk::Label,
     current: Rc<RefCell<Config>>,
     syncing: Cell<bool>,
@@ -116,13 +115,6 @@ impl PositionControls {
         {
             button.set_active(config.tab_layout == layout);
         }
-        for (button, marker) in self
-            .markers
-            .iter()
-            .zip([MarkerStyle::Dots, MarkerStyle::Bar])
-        {
-            button.set_active(config.marker_style == marker);
-        }
         self.syncing.set(false);
     }
     fn result(&self, result: Result<(), String>) {
@@ -154,8 +146,6 @@ impl PositionControls {
         section(&root, "Visible notes", &counts.0);
         let layouts = choices(&["Classic", "Stacked"], 1);
         section(&root, "Tabs", &layouts.0);
-        let markers = choices(&["Pills", "Bar"], 1);
-        section(&root, "Marker", &markers.0);
         let error = gtk::Label::new(None);
         error.set_wrap(true);
         error.set_max_width_chars(28);
@@ -168,7 +158,6 @@ impl PositionControls {
             presets: presets.1,
             counts: counts.1,
             layouts: layouts.1,
-            markers: markers.1,
             error,
             current,
             syncing: Cell::new(false),
@@ -221,20 +210,12 @@ impl PositionControls {
                 }
             });
         }
-        for (buttons, write) in [
-            (
-                &controls.layouts,
-                (|c: &mut Config, index: usize| {
-                    c.tab_layout = [TabLayout::Classic, TabLayout::Stacked][index]
-                }) as fn(&mut Config, usize),
-            ),
-            (
-                &controls.markers,
-                (|c: &mut Config, index: usize| {
-                    c.marker_style = [MarkerStyle::Dots, MarkerStyle::Bar][index]
-                }) as fn(&mut Config, usize),
-            ),
-        ] {
+        for (buttons, write) in [(
+            &controls.layouts,
+            (|c: &mut Config, index: usize| {
+                c.tab_layout = [TabLayout::Classic, TabLayout::Stacked][index]
+            }) as fn(&mut Config, usize),
+        )] {
             for (index, button) in buttons.iter().enumerate() {
                 let weak = Rc::downgrade(&controls);
                 let change = change.clone();
