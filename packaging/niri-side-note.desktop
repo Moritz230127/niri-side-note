@@ -1,12 +1,12 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Stickies 中文版
-Name[zh_CN]=Stickies 中文版
+Name=Niri 侧笺
+Name[zh_CN]=Niri 侧笺
 Comment=贴边使用的本地便签
 Comment[zh_CN]=贴边使用的本地便签
-TryExec=stickies-cn
-Exec=stickies-cn
+TryExec=niri-side-note
+Exec=niri-side-note
 Icon=dev.stickies.Stickies
 Terminal=false
 Categories=Utility;

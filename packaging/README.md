@@ -1,3 +1,5 @@
+> 本分支的 Arch 包由 https://github.com/Moritz230127/rodriguez 发布；以下为上游发布流程文档，命令中的 `stickies` 名称不一定适用于本分支。
+
 # Arch packaging preparation
 
 Linux and Windows share `main`. Windows uses the [Windows ZIP guide](windows.md); the Arch procedure below remains Linux-specific.

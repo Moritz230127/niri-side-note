@@ -7,11 +7,11 @@ BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 APP_DIR="$DATA_HOME/applications"
 ICON_DIR="$DATA_HOME/icons/hicolor/128x128/apps"
-BIN="$BIN_DIR/stickies-cn"
-DESKTOP="$APP_DIR/stickies-cn.desktop"
+BIN="$BIN_DIR/niri-side-note"
+DESKTOP="$APP_DIR/niri-side-note.desktop"
 
-install -Dm755 "$ROOT/bin/stickies-cn" "$BIN"
-install -Dm644 "$ROOT/share/applications/stickies-cn.desktop" "$DESKTOP"
+install -Dm755 "$ROOT/bin/niri-side-note" "$BIN"
+install -Dm644 "$ROOT/share/applications/niri-side-note.desktop" "$DESKTOP"
 install -Dm644 "$ROOT/share/icons/hicolor/128x128/apps/dev.stickies.Stickies.png" \
     "$ICON_DIR/dev.stickies.Stickies.png"
 

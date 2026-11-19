@@ -1,3 +1,4 @@
+# 本分支实际由 rodriguez 仓库的 pkgs/niri-side-note-bin 构建；此文件是上游源码打包模板。
 # Source template. Run packaging/prepare-release.py to produce a PKGBUILD
 # with the manifest version and the exact local source archive SHA-256.
 pkgname=stickies
