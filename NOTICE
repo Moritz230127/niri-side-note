@@ -1,0 +1,12 @@
+Niri 侧笺 (Niri Side Note)
+
+This is an unofficial Simplified Chinese fork of Stickies:
+  https://github.com/0atxl/stickies
+
+Upstream copyright and license notices are preserved in LICENSE and in the
+source files. The fork's modifications are distributed under the same
+MPL-2.0 license. The complete corresponding source is this repository.
+
+The internal application ID and XDG data paths remain "stickies" so that
+existing notes and configuration keep working; the product name, package
+name and executable are "Niri 侧笺" / "niri-side-note".

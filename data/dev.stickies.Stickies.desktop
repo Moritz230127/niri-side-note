@@ -1,10 +1,11 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Stickies
-Comment=Keep local notes at the edge of your desktop
-TryExec=stickies
-Exec=stickies
+Name=Niri 侧笺
+GenericName=便签
+Comment=贴边便签笔记，常驻屏幕边缘
+TryExec=niri-side-note
+Exec=niri-side-note
 Icon=dev.stickies.Stickies
 Terminal=false
 Categories=Utility;

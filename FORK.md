@@ -1,6 +1,6 @@
-# 本地分支说明（中文单语）
+# Niri 侧笺：分支说明
 
-本分支是在上游 Stickies 0.10.3 基础上做的本地二次开发，目标是一个只面向简体中文、贴边使用、可自由选屏的日常便签工具。
+Niri 侧笺是上游 [0atxl/stickies](https://github.com/0atxl/stickies) 0.10.3 的**非官方简体中文分支**，与上游项目无隶属关系。目标是一个只面向简体中文、贴边使用、可自由选屏的日常便签工具。
 
 ## 与上游的主要差异
 
@@ -12,22 +12,23 @@
 - 删除应用内「开机自启」开关和 `autostart` 模块；开机启动统一交给 niri：
 
 ```kdl
-spawn-at-startup "/home/Arch/.local/bin/stickies"
+spawn-at-startup "/usr/bin/niri-side-note"
 ```
 
-## 配置兼容
+## 命名与兼容
 
-- `Config` 不再拒绝未知键；旧配置中的 `launch_at_login`、`marker_style`、`visible_notes` 会被忽略并在下次保存时移除。
-- `marker_offset` 仍保留，表示沿边缘的位置（0..1），键名为兼容旧配置未改名。
+- 产品名：**Niri 侧笺**（Niri Side Note）。
+- 命令/包名：`niri-side-note`；源码里的 Cargo 包名、D-Bus 应用 ID、配置与数据目录仍沿用 `stickies`，以免覆盖上游包或丢失旧笔记。
+- 配置：`~/.config/stickies/config.toml`；数据：`~/.local/share/stickies/notes.db`。
 
 ## 构建与安装
 
 ```bash
 cargo build --release --locked
-install -Dm755 target/release/stickies ~/.local/bin/stickies
+install -Dm755 target/release/stickies ~/.local/bin/niri-side-note
 ```
 
-niri 自启和启动器均指向 `~/.local/bin/stickies`；不要使用 `/usr/bin/stickies`（上游旧版）。
+niri 自启和启动器均指向 `niri-side-note`；不要与上游 `/usr/bin/stickies` 混用。
 
 ## 已知限制
 
@@ -35,3 +36,7 @@ niri 自启和启动器均指向 `~/.local/bin/stickies`；不要使用 `/usr/bi
 - 中文需要系统 CJK 字体（如 `noto-fonts-cjk`）；没有字体时中文会缺字形。
 - 设置里的屏幕列表在打开时枚举；运行中热插拔显示器需要重开设置。
 - 真实鼠标 hover 与重叠标签坐标命中仍以真机测试为准。
+
+## 许可证
+
+上游与本分支均采用 **MPL-2.0**；完整许可证见 [LICENSE](LICENSE)。本分支的修改与打包脚本以同一许可证公开，完整对应源码即本仓库。

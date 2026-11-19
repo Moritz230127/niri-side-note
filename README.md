@@ -1,10 +1,10 @@
-# Stickies 中文版
+# Niri 侧笺（Niri Side Note）
 
 贴边便签工具：便签标签常驻屏幕边缘，鼠标靠近时展开，点标题打开便签，离开后自动收回。
 
-> 本项目是 [0atxl/stickies](https://github.com/0atxl/stickies) 的**私人简体中文分支**。
-> 界面、日期、CLI 与错误提示直接使用中文，不包含运行时语言切换。
-> 基于上游 `0.10.3`，当前私人版本为 `v0.10.3-cn.1`。
+> 本项目是 [0atxl/stickies](https://github.com/0atxl/stickies) 的**非官方简体中文分支**，与上游项目无隶属关系。
+> 基于上游 `0.10.3`，当前分支版本为 `v0.10.3-niri.1`，遵循 **MPL-2.0**。
+> 产品名为「Niri 侧笺」；内部应用 ID 与数据目录仍沿用 `stickies`，以兼容已有笔记。
 
 ![文档式标签](docs/images/tabs.png)
 
@@ -58,58 +58,47 @@
 
 ## 安装
 
-Release 下载（私人仓库）：<https://github.com/Moritz230127/stickies-cn/releases/latest>
+### Arch 包（个人源）
 
-### Arch 包
+本分支由个人 pacman 源 `rodriguez` 分发：
 
-从私人仓库的 Release 下载：
-
-```text
-stickies-cn-0.10.3-1-x86_64.pkg.tar.zst
+```ini
+[rodriguez]
+SigLevel = Required DatabaseOptional
+Server = https://github.com/Moritz230127/rodriguez/releases/download/rolling
 ```
-
-安装：
 
 ```bash
-sudo pacman -U stickies-cn-0.10.3-1-x86_64.pkg.tar.zst
+sudo pacman -Syu
+sudo pacman -S niri-side-note
 ```
 
-安装后的命令是 `stickies-cn`，桌面文件为“Stickies 中文版”。
-
-### 便携包
-
-下载并解压 `stickies-cn-0.10.3-linux-x86_64.tar.gz`，然后：
-
-```bash
-tar -xzf stickies-cn-0.10.3-linux-x86_64.tar.gz
-cd stickies-cn-0.10.3-linux-x86_64
-./install.sh
-```
-
-安装到 `~/.local/bin/stickies-cn` 和 `~/.local/share/applications/`；不会自动启用开机启动。
+安装后的命令是 `niri-side-note`，桌面文件为“Niri 侧笺”。
 
 ### 从源码构建
 
+需要 Rust、GTK 4、libadwaita 和 `gtk4-layer-shell`：
+
 ```bash
 cargo build --release --locked
-install -Dm755 target/release/stickies ~/.local/bin/stickies-cn
+install -Dm755 target/release/stickies ~/.local/bin/niri-side-note
 ```
 
-> 上游包名也是 `stickies`。为避免覆盖 `/usr/bin/stickies`，本分支的安装包使用
-> `stickies-cn` 作为命令名。
+> 上游包名也是 `stickies`。为避免覆盖上游安装，本分支的包名与命令名使用
+> `niri-side-note`，源码里的 Cargo 包名与内部应用 ID 仍是 `stickies`。
 
 ### 开机启动（niri）
 
 应用内不再管理开机自启。需要时在 niri 配置中加入：
 
 ```kdl
-spawn-at-startup "/usr/bin/stickies-cn"
+spawn-at-startup "/usr/bin/niri-side-note"
 ```
 
-便携安装则使用：
+从源码安装到用户目录时：
 
 ```kdl
-spawn-at-startup "/home/你的用户名/.local/bin/stickies-cn"
+spawn-at-startup "/home/你的用户名/.local/bin/niri-side-note"
 ```
 
 ## 使用
@@ -123,6 +112,8 @@ spawn-at-startup "/home/你的用户名/.local/bin/stickies-cn"
 7. 设置 → 标签样式：经典 / 叠放。
 
 ## 配置与数据
+
+> 为兼容旧版笔记，配置和数据目录没有随产品名改动。
 
 - 配置：`~/.config/stickies/config.toml`
 - 数据：`~/.local/share/stickies/notes.db`
@@ -152,4 +143,5 @@ cargo fmt --all -- --check
 
 ## 许可证与致谢
 
-本项目基于 [0atxl/stickies](https://github.com/0atxl/stickies)，沿用 **MPL-2.0** 许可证；详见 [LICENSE](LICENSE)。
+本项目是 [0atxl/stickies](https://github.com/0atxl/stickies) 的非官方分支，沿用上游的 **MPL-2.0** 许可证；详见 [LICENSE](LICENSE)。
+上游版权归其贡献者所有。本分支的修改、简体中文本地化与打包脚本同样以 MPL-2.0 公开；完整对应源码见本仓库。

@@ -327,7 +327,7 @@ impl ManagerUi {
         } else if archived {
             "归档为空"
         } else if !self.has_saved_notes.get() {
-            "欢迎使用 Stickies"
+            "欢迎使用 Niri 侧笺"
         } else {
             "没有现有便签"
         });
@@ -1334,7 +1334,7 @@ mod feedback_tests {
         ui.show_manager();
         let manager = ui.manager.borrow().clone().unwrap();
         let manager = &manager.0;
-        assert_eq!(manager.empty_title.text(), "Welcome to Stickies");
+        assert_eq!(manager.empty_title.text(), "欢迎使用 Niri 侧笺");
         assert_eq!(
             manager.empty_action.label().as_deref(),
             Some("Create your first note")
@@ -1369,7 +1369,7 @@ mod feedback_tests {
         manager.refresh(Some(first));
         manager.controls.delete.emit_clicked();
         assert!(!manager.filter_row.is_visible());
-        assert_eq!(manager.empty_title.text(), "Welcome to Stickies");
+        assert_eq!(manager.empty_title.text(), "欢迎使用 Niri 侧笺");
         fn undo_button(widget: &gtk::Widget) -> Option<gtk::Button> {
             if let Some(button) = widget.downcast_ref::<gtk::Button>()
                 && button.label().as_deref() == Some("Undo")

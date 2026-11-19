@@ -541,18 +541,18 @@ pub fn build(
         extras.push(Box::new(move || sync()));
     }
     root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-    let quit = gtk::Button::with_label("退出 Stickies");
+    let quit = gtk::Button::with_label("退出 Niri 侧笺");
     quit.add_css_class("reposition-button");
     quit.set_action_name(Some("app.quit"));
     root.append(&quit);
 
     root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     let github =
-        gtk::LinkButton::with_label("https://github.com/0atxl/stickies", "在 GitHub 上点星");
+        gtk::LinkButton::with_label("https://github.com/Moritz230127/niri-side-note", "项目主页");
     github.set_halign(gtk::Align::Center);
     github.add_css_class("github-footer");
     let link_content = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    link_content.append(&gtk::Label::new(Some("在 GitHub 上点星")));
+    link_content.append(&gtk::Label::new(Some("项目主页")));
     link_content.append(&crate::ui_assets::image("popout"));
     github.set_child(Some(&link_content));
     root.append(&github);

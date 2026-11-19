@@ -9,14 +9,14 @@ pub use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 pub fn check_display_support() -> Result<(), String> {
     if !gtk4_layer_shell::is_supported() {
         return Err(
-            "Stickies requires Wayland with zwlr_layer_shell_v1 version 4 or newer; Layer Shell is unavailable on this display."
+            "Niri 侧笺 requires Wayland with zwlr_layer_shell_v1 version 4 or newer; Layer Shell is unavailable on this display."
                 .into(),
         );
     }
     let protocol_version = gtk4_layer_shell::protocol_version();
     if protocol_version < 4 {
         return Err(format!(
-            "Stickies requires zwlr_layer_shell_v1 version 4 or newer for on-demand keyboard focus; this display provides version {protocol_version}."
+            "Niri 侧笺 requires zwlr_layer_shell_v1 version 4 or newer for on-demand keyboard focus; this display provides version {protocol_version}."
         ));
     }
     Ok(())
@@ -911,7 +911,7 @@ mod imp_windows {
                         )
                     } == 0
                 {
-                    eprintln!("Stickies could not preserve the edge window's taskbar style.");
+                    eprintln!("Niri 侧笺 could not preserve the edge window's taskbar style.");
                 }
                 sync_hwnd_styles_and_z(window);
                 let info = STATES.with(|map| {
