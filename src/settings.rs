@@ -455,18 +455,11 @@ pub fn build(
     root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     root.append(&motion_row);
     let mut extras: Vec<Box<dyn Fn()>> = Vec::new();
-    for (label, read, write) in [
-        (
-            "悬停展开",
-            (|c: &Config| c.edge_hover_enabled) as fn(&Config) -> bool,
-            (|c: &mut Config, v| c.edge_hover_enabled = v) as fn(&mut Config, bool),
-        ),
-        (
-            "开机自启",
-            |c: &Config| c.launch_at_login,
-            |c: &mut Config, v| c.launch_at_login = v,
-        ),
-    ] {
+    for (label, read, write) in std::iter::once((
+        "悬停展开",
+        (|c: &Config| c.edge_hover_enabled) as fn(&Config) -> bool,
+        (|c: &mut Config, v| c.edge_hover_enabled = v) as fn(&mut Config, bool),
+    )) {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         let text = gtk::Label::new(Some(label));
         text.set_hexpand(true);
