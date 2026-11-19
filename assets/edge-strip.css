@@ -193,6 +193,16 @@
 .edge-window .edge-delete-toast button { background: transparent; color: inherit; border: none; box-shadow: none; padding: 4px 6px; min-height: 22px; border-radius: 5px; font-size: 13px; }
 
 .edge-window .edge-marker .marker-pill { min-width: 0; min-height: 0; border-radius: 3px; box-shadow: none; }
+/* Persistent identity chip on overlapping tabs: colour + first character. */
+.edge-window .tab-badge {
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 5px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+}
 .edge-window .edge-marker .marker-pill:not(.edge-result-color) { background: #88847d; }
 
 /* Classic reveals one continuous tab from off screen; no shadow seam. */

@@ -541,6 +541,8 @@ fn screen_button(label: &str, group: Option<&gtk::ToggleButton>) -> gtk::ToggleB
     button.set_halign(gtk::Align::Fill);
     button.set_hexpand(true);
     button.set_group(group);
+    button.update_property(&[gtk::accessible::Property::Label(label)]);
+    button.set_tooltip_text(Some(label));
     button
 }
 

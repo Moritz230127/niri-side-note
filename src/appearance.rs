@@ -108,7 +108,8 @@ pub fn palette_css() -> String {
                 ".icon-control.{class} {{ color: rgb({r},{g},{b}); }}
             .note-tab.{class} {{ --edge-accent: rgb({r},{g},{b}); }}
             .edge-result-color.{class}, .management .{class} .tag-bar, .current-color-dot.{class},
-            .note-controls .color-swatch.{class} {{ background: rgb({r},{g},{b}); }}
+            .edge-color-bar.{class}, .note-controls .color-swatch.{class} {{ background: rgb({r},{g},{b}); }}
+            .tab-badge.{class} {{ background: rgb({r},{g},{b}); color: {swatch_ink}; }}
             .note-controls .color-swatch.{class} {{ color: {swatch_ink}; }}
             "
             )

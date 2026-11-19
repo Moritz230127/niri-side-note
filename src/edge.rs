@@ -2054,10 +2054,11 @@ impl Ui {
             // 60 px rotated label. Natural text width must not escape its inset.
             label.set_max_width_chars(1);
             label.set_xalign(0.5);
-            if horizontal {
+            tab.set_tooltip_text(Some(title));
+            let content: gtk::Widget = if horizontal {
                 label.set_margin_start(s(9));
                 label.set_margin_end(s(9));
-                tab.set_child(Some(&label));
+                label.upcast()
             } else {
                 let lh = s(16);
                 let tw = s(22);
@@ -2081,8 +2082,52 @@ impl Ui {
                         .rotate(-90.)
                 };
                 text.set_child_transform(&label, Some(&transform));
-                tab.set_child(Some(&text));
+                text.upcast()
+            };
+            let overlay = gtk::Overlay::new();
+            overlay.set_child(Some(&content));
+            let accent = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            accent.add_css_class("edge-color-bar");
+            accent.set_can_target(false);
+            appearance::set_color(&accent, note.color);
+            if horizontal {
+                accent.set_size_request(-1, s(6));
+                accent.set_hexpand(true);
+                accent.set_valign(if config.edge == ScreenEdge::Top {
+                    gtk::Align::Start
+                } else {
+                    gtk::Align::End
+                });
+            } else {
+                accent.set_size_request(s(6), -1);
+                accent.set_vexpand(true);
+                accent.set_halign(if config.edge == ScreenEdge::Right {
+                    gtk::Align::End
+                } else {
+                    gtk::Align::Start
+                });
             }
+            overlay.add_overlay(&accent);
+            let initial = title
+                .chars()
+                .next()
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "?".into());
+            let badge = gtk::Label::new(Some(&initial));
+            badge.add_css_class("tab-badge");
+            appearance::set_color(&badge, note.color);
+            badge.set_size_request(s(20), s(20));
+            badge.set_halign(gtk::Align::Center);
+            if horizontal {
+                badge.set_halign(gtk::Align::Start);
+                badge.set_valign(gtk::Align::Center);
+                badge.set_margin_start(s(3));
+            } else {
+                badge.set_valign(gtk::Align::Start);
+                badge.set_margin_top(s(3));
+            }
+            overlay.add_overlay(&badge);
+            tab.set_child(Some(&overlay));
             let extension = if config.tab_layout == config::TabLayout::Classic {
                 s(6)
             } else {
