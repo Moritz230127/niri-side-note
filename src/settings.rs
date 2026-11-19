@@ -78,6 +78,8 @@ struct PositionControls {
     root: gtk::Box,
     edges: Vec<gtk::ToggleButton>,
     presets: Vec<gtk::ToggleButton>,
+    custom: gtk::ToggleButton,
+    custom_offset: Cell<Option<f64>>,
     layouts: Vec<gtk::ToggleButton>,
     screens: Vec<(gtk::ToggleButton, Option<String>)>,
     error: gtk::Label,
@@ -101,9 +103,17 @@ impl PositionControls {
         } else {
             ["上", "居中", "下"]
         };
+        let selected_preset = preset_index(config.marker_offset);
         for (index, button) in self.presets.iter().enumerate() {
             button.set_label(labels[index]);
-            button.set_active((config.marker_offset - index as f64 / 2.).abs() < 0.000001);
+            button.update_property(&[gtk::accessible::Property::Label(labels[index])]);
+            button.set_active(selected_preset == Some(index));
+        }
+        let custom_selected = selected_preset.is_none();
+        self.custom.set_active(custom_selected);
+        self.custom.set_visible(self.custom_offset.get().is_some());
+        if custom_selected {
+            self.custom_offset.set(Some(config.marker_offset));
         }
         for (button, layout) in self
             .layouts
@@ -136,6 +146,17 @@ impl PositionControls {
         section(&root, "屏幕", &screens.0);
         let edges = choices(&["左", "右", "上", "下"], 0);
         let presets = choices(&["上", "居中", "下"], 1);
+        let initial = current.borrow();
+        let custom_offset = Cell::new(initial.custom_marker_offset.or_else(|| {
+            (preset_index(initial.marker_offset).is_none()).then_some(initial.marker_offset)
+        }));
+        drop(initial);
+        let custom = gtk::ToggleButton::with_label("自定义");
+        custom.set_group(presets.1.first());
+        custom.set_tooltip_text(Some("恢复自定义位置"));
+        custom.update_property(&[gtk::accessible::Property::Label("自定义位置")]);
+        custom.set_visible(custom_offset.get().is_some());
+        presets.0.append(&custom);
         section(&root, "贴边位置", &edges.0);
         let position = gtk::Box::new(gtk::Orientation::Vertical, 10);
         position.append(&presets.0);
@@ -156,6 +177,8 @@ impl PositionControls {
             root,
             edges: edges.1,
             presets: presets.1,
+            custom,
+            custom_offset,
             layouts: layouts.1,
             screens: screens.1,
             error,
@@ -192,6 +215,24 @@ impl PositionControls {
                 {
                     let mut config = controls.current.borrow().clone();
                     config.marker_offset = index as f64 / 2.;
+                    controls.result(change(config));
+                }
+            });
+        }
+        {
+            let weak = Rc::downgrade(&controls);
+            let change = change.clone();
+            controls.custom.connect_toggled(move |button| {
+                if let Some(controls) = weak.upgrade()
+                    && !controls.syncing.get()
+                    && button.is_active()
+                {
+                    let Some(offset) = controls.custom_offset.get() else {
+                        return;
+                    };
+                    let mut config = controls.current.borrow().clone();
+                    config.marker_offset = offset;
+                    config.custom_marker_offset = Some(offset);
                     controls.result(change(config));
                 }
             });
@@ -611,6 +652,13 @@ fn section(root: &gtk::Box, name: &str, control: &impl IsA<gtk::Widget>) {
     box_.append(control);
     root.append(&box_);
 }
+/// 位置预设只接受 0/0.5/1；其余值作为「自定义」保留，切换回来时可恢复。
+fn preset_index(offset: f64) -> Option<usize> {
+    [0.0, 0.5, 1.0]
+        .iter()
+        .position(|preset| (offset - preset).abs() < 0.000001)
+}
+
 fn choices(labels: &[&str], selected: usize) -> (gtk::Box, Vec<gtk::ToggleButton>) {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     row.add_css_class("segments");
@@ -629,6 +677,14 @@ fn choices(labels: &[&str], selected: usize) -> (gtk::Box, Vec<gtk::ToggleButton
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn custom_position_is_not_confused_with_presets() {
+        assert_eq!(preset_index(0.0), Some(0));
+        assert_eq!(preset_index(0.5), Some(1));
+        assert_eq!(preset_index(1.0), Some(2));
+        assert_eq!(preset_index(0.352_798), None);
+    }
 
     #[test]
     #[ignore = "requires a GTK display"]

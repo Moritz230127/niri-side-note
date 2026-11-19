@@ -125,6 +125,15 @@ const MAX_EDGE_NOTES: usize = 20;
 // Fixed-length tabs first sit centered. Once their natural span no longer
 // fits the edge, increase the overlap until the group fills the available
 // length. A tab always keeps at least 28 logical pixels visible.
+/// 这些设置会改变窗口/标签的像素几何，必须丢弃旧的绝对像素偏移，
+/// 否则切换标签布局或换屏后会沿用按旧尺寸夹紧过的位置。
+pub(super) fn offsets_need_reset(old: &Config, new: &Config) -> bool {
+    old.edge != new.edge
+        || old.marker_offset != new.marker_offset
+        || old.monitor != new.monitor
+        || old.tab_layout != new.tab_layout
+}
+
 /// 标签固定长度；数量超过边缘容量后，用负间距让标签逐渐重叠。
 /// 至少保留 28 逻辑像素可见，避免完全盖住前一个标签。
 fn deck_gap(config: &Config, count: usize, length: i32, available: i32) -> i32 {
@@ -4581,5 +4590,16 @@ mod feedback_tests {
         assert!(ui.edge.toast_note.get().is_none());
         ui.edge.window.close();
         ui.edge.strip_window.close();
+    }
+    #[test]
+    fn layout_changes_invalidate_pixel_offsets() {
+        let base = Config::default();
+        let mut classic = base.clone();
+        classic.tab_layout = config::TabLayout::Classic;
+        assert!(offsets_need_reset(&base, &classic));
+        assert!(!offsets_need_reset(&base, &base));
+        let mut theme = base.clone();
+        theme.theme = config::Theme::Playful;
+        assert!(!offsets_need_reset(&base, &theme));
     }
 }

@@ -657,12 +657,16 @@ impl Ui {
         manager.present();
     }
 
-    fn change_settings(self: &Rc<Self>, config: Config) -> Result<(), String> {
+    fn change_settings(self: &Rc<Self>, mut config: Config) -> Result<(), String> {
         if self.edge.state().is_repositioning() {
             return Err("更改设置前请先选择“完成”或“取消”。".into());
         }
         if !self.config_valid {
             return Err("现有配置无效。请先修正再保存设置；当前文件尚未被覆盖。".into());
+        }
+        // 拖动贴边条产生的非预设位置也记入历史，之后可从设置里恢复。
+        if !config::is_preset_offset(config.marker_offset) {
+            config.custom_marker_offset = Some(config.marker_offset);
         }
         config
             .save(&config::config_path())
@@ -670,26 +674,28 @@ impl Ui {
         let timeout_changed = self.config.borrow().inactivity_seconds != config.inactivity_seconds;
         let motion_changed = self.config.borrow().reduced_motion != config.reduced_motion;
         let monitor_changed = self.config.borrow().monitor != config.monitor;
-        if self.config.borrow().edge != config.edge
-            || self.config.borrow().marker_offset != config.marker_offset
-            || monitor_changed
-        {
+        let reset_offsets = edge::offsets_need_reset(&self.config.borrow(), &config);
+        // Finish any old animation before replacing the config, otherwise its
+        // pending refresh would write geometry based on the old layout.
+        self.finish_edge_motion();
+        self.config.replace(config.clone());
+        if reset_offsets {
             self.edge.docked_offset.set(None);
             self.edge.strip_offset.set(None);
         }
-        self.finish_edge_motion();
-        self.config.replace(config.clone());
         if motion_changed {
             apply_motion_preference(config.reduced_motion);
         }
         appearance::apply(&self.provider, &config);
+        // A screen change may resolve to the same monitor (for example,
+        // explicit HDMI -> auto on the first screen). Refresh unconditionally
+        // so the cleared offset caches are always rebuilt with the new config.
         if monitor_changed {
             self.recover_monitor();
-        } else {
-            self.place_edge();
-            self.update_visibility();
-            self.refresh_tabs();
         }
+        self.place_edge();
+        self.update_visibility();
+        self.refresh_tabs();
         if let Some(editor) = self.edge.docked.borrow().as_ref() {
             editor.refresh_appearance();
             if timeout_changed {

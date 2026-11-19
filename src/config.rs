@@ -150,6 +150,9 @@ pub struct Config {
     pub monitor: Option<String>,
     /// 沿屏幕边缘的位置（0..1）。键名沿用旧版 `marker_offset` 以兼容配置。
     pub marker_offset: f64,
+    /// 最近一次非预设的自定义位置；位置控件切换回「自定义」时恢复它。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_marker_offset: Option<f64>,
     pub edge_hover_enabled: bool,
     pub theme: Theme,
     pub playful_edges: PlayfulEdges,
@@ -178,6 +181,7 @@ impl Default for Config {
             edge: ScreenEdge::Right,
             monitor: None,
             marker_offset: 0.5,
+            custom_marker_offset: None,
             edge_hover_enabled: true,
             theme: Theme::Paper,
             playful_edges: PlayfulEdges::Wavy,
@@ -194,6 +198,13 @@ impl Default for Config {
             legacy_note_defaults: [false; 2],
         }
     }
+}
+
+/// 位置控件的三个预设：上/左、居中、下/右。
+pub fn is_preset_offset(offset: f64) -> bool {
+    [0.0, 0.5, 1.0]
+        .iter()
+        .any(|preset| (offset - preset).abs() < 0.000001)
 }
 
 impl Config {
@@ -221,6 +232,11 @@ impl Config {
         let removed_footer = preferences.remove("footer_style").is_some();
         let mut config: Self = preferences.try_into()?;
         config.legacy_note_defaults = legacy_note_defaults;
+        // 旧配置只有 marker_offset；若它本来就不是预设值，补一份自定义历史，
+        // 这样设置面板重新打开后仍能切回原位置。
+        if config.custom_marker_offset.is_none() && !is_preset_offset(config.marker_offset) {
+            config.custom_marker_offset = Some(config.marker_offset);
+        }
         // Older files allowed custom timeouts from 30 to 1800 seconds.
         // Use the default when a legacy value has no matching Behavior choice.
         if (30..=1800).contains(&config.inactivity_seconds)
@@ -252,6 +268,11 @@ impl Config {
     fn validate(&self) -> Result<(), ConfigError> {
         if !self.marker_offset.is_finite() || !(0.0..=1.0).contains(&self.marker_offset) {
             return Err(ConfigError::InvalidMarkerOffset(self.marker_offset));
+        }
+        if let Some(offset) = self.custom_marker_offset
+            && (!offset.is_finite() || !(0.0..=1.0).contains(&offset))
+        {
+            return Err(ConfigError::InvalidMarkerOffset(offset));
         }
         if !matches!(self.inactivity_seconds, 0 | 60 | 120 | 300) {
             return Err(ConfigError::InvalidValue(
@@ -466,8 +487,13 @@ mod tests {
         let path = directory.join("config.toml");
         let config = Config {
             edge: ScreenEdge::Left,
-            marker_offset: 0.25,
+            monitor: Some("HDMI-A-1".into()),
+            marker_offset: 0.37,
+            custom_marker_offset: Some(0.37),
             edge_hover_enabled: false,
+            theme: Theme::Playful,
+            appearance: Appearance::Light,
+            tab_layout: TabLayout::Classic,
             ..Config::default()
         };
 
@@ -479,6 +505,23 @@ mod tests {
         assert!(!path.with_extension("toml.tmp").exists());
 
         fs::remove_dir_all(directory).expect("test directory should be removable");
+    }
+
+    #[test]
+    fn legacy_custom_position_is_remembered_for_the_settings_panel() {
+        let directory = test_directory("legacy-custom-position");
+        let path = directory.join("config.toml");
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(&path, "marker_offset = 0.37\n").unwrap();
+        let config = Config::load(&path).unwrap();
+        assert_eq!(config.marker_offset, 0.37);
+        assert_eq!(config.custom_marker_offset, Some(0.37));
+        config.save(&path).unwrap();
+        assert_eq!(Config::load(&path).unwrap(), config);
+
+        fs::write(&path, "marker_offset = 0.5\n").unwrap();
+        assert_eq!(Config::load(&path).unwrap().custom_marker_offset, None);
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
