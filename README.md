@@ -58,6 +58,8 @@
 
 ## 安装
 
+Release 下载（私人仓库）：<https://github.com/Moritz230127/stickies-cn/releases/latest>
+
 ### Arch 包
 
 从私人仓库的 Release 下载：
