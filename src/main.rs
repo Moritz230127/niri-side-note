@@ -1,3 +1,5 @@
+// 中文单语本地分支：界面文案直接写简体中文，不再包含运行时翻译层。
+// 贴边条、屏幕选择和标签布局的本地实现集中在 edge.rs / edge_surface.rs。
 #![cfg_attr(
     all(target_os = "windows", not(debug_assertions)),
     windows_subsystem = "windows"
@@ -5,7 +7,6 @@
 
 mod app;
 mod appearance;
-mod autostart;
 mod checklist;
 mod cli;
 mod config;
@@ -666,7 +667,6 @@ impl Ui {
         config
             .save(&config::config_path())
             .map_err(|e| e.to_string())?;
-        let login_changed = self.config.borrow().launch_at_login != config.launch_at_login;
         let timeout_changed = self.config.borrow().inactivity_seconds != config.inactivity_seconds;
         let motion_changed = self.config.borrow().reduced_motion != config.reduced_motion;
         let monitor_changed = self.config.borrow().monitor != config.monitor;
@@ -701,10 +701,6 @@ impl Ui {
         }
         if let Some(manager) = self.manager.borrow().as_ref() {
             manager.refresh_appearance();
-        }
-        if login_changed {
-            autostart::reconcile(&autostart::autostart_path(), config.launch_at_login)
-                .map_err(|e| format!("设置已保存，但开机自启更新失败：{e}"))?;
         }
         Ok(())
     }
@@ -848,12 +844,6 @@ fn build(application: &gtk::Application, startup_error_pending: &Rc<Cell<bool>>)
             eprintln!("Stickies 保留了便签样式，但无法清理全局默认值：{error}");
             return None;
         }
-    }
-    if valid
-        && let Err(error) =
-            autostart::reconcile(&autostart::autostart_path(), config.launch_at_login)
-    {
-        eprintln!("Stickies 无法更新开机自启：{error}");
     }
     let provider = gtk::CssProvider::new();
     appearance::apply(&provider, &config);
@@ -1134,7 +1124,6 @@ mod edge_tests {
         ui_assets::register().unwrap();
         adw::init().unwrap();
         Config {
-            launch_at_login: false,
             ..Config::default()
         }
         .save(&config::config_path())
@@ -2064,7 +2053,6 @@ mod edge_tests {
         }
         storage.set_note_pinned(ids[0], true).unwrap();
         Config {
-            launch_at_login: false,
             ..Config::default()
         }
         .save(&config::config_path())
@@ -2110,7 +2098,6 @@ mod edge_tests {
                 config.theme = theme;
                 config.appearance = appearance;
                 config.marker_offset = 0.5;
-                config.launch_at_login = false;
                 ui.change_settings(config).unwrap();
                 settle();
                 let prefix = format!("{name}-{edge:?}").to_lowercase();

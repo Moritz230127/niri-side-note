@@ -125,6 +125,8 @@ const MAX_EDGE_NOTES: usize = 20;
 // Fixed-length tabs first sit centered. Once their natural span no longer
 // fits the edge, increase the overlap until the group fills the available
 // length. A tab always keeps at least 28 logical pixels visible.
+/// 标签固定长度；数量超过边缘容量后，用负间距让标签逐渐重叠。
+/// 至少保留 28 逻辑像素可见，避免完全盖住前一个标签。
 fn deck_gap(config: &Config, count: usize, length: i32, available: i32) -> i32 {
     if count <= 1 {
         return 0;
@@ -223,7 +225,6 @@ enum StripInput {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Effects {
-    marker_visible: bool,
     tabs_visible: bool,
     panel: Option<&'static str>,
     pointer_visible: bool,
@@ -266,7 +267,6 @@ fn transition(state: EdgeState, event: EdgeEvent, policy: Policy) -> (EdgeState,
         Layer::Overlay
     };
     let mut effects = Effects {
-        marker_visible: false,
         tabs_visible: state.is_revealed(),
         panel,
         pointer_visible: matches!(state, State::Search | State::Docked(_)),
@@ -344,7 +344,6 @@ pub(super) struct Strip {
     pub(super) strip_bounds: Cell<(i32, i32, i32, i32)>,
     pub(super) panel_bounds: Cell<(i32, i32, i32, i32)>,
     pub(super) stack: gtk::Stack,
-    pub(super) marker: gtk::Box,
     pub(super) tabs: gtk::Box,
     pub(super) edge_search: gtk::SearchEntry,
     search_popover: gtk::Popover,
@@ -376,7 +375,8 @@ pub(super) struct Strip {
     pending_motion: Cell<Option<EdgeState>>,
     deferred_hide: Cell<Option<u64>>,
     refresh_pending: Cell<bool>,
-    marker_bounds: Cell<(i32, i32, i32, i32)>,
+    // Dormant-state full-edge trigger rectangle, used for the input region.
+    trigger_bounds: Cell<(i32, i32, i32, i32)>,
     tab_hover: RefCell<Vec<Rc<motion::Motion>>>,
     strip_motion: motion::Motion,
     panel_motion: motion::Motion,
@@ -403,6 +403,8 @@ fn monitor_key(monitor: &gtk::gdk::Monitor) -> Option<String> {
         })
 }
 
+/// 选择贴边窗口所在的显示器。
+/// 优先使用配置的 connector；该屏幕暂时断开时保留 previous，最后回退到第一块屏幕。
 fn choose_monitor(
     monitors: &[gtk::gdk::Monitor],
     configured: Option<&str>,
@@ -602,11 +604,6 @@ impl Strip {
         }
         reposition_panel.append(&actions);
         stack.add_named(&reposition_panel, Some("reposition"));
-        let marker = gtk::Box::new(gtk::Orientation::Vertical, s(6));
-        marker.add_css_class("edge-marker");
-
-        marker.set_can_target(false);
-        strip_root.add_overlay(&marker);
         strip_root.add_overlay(&tabs);
         let delete_toast = gtk::Box::new(gtk::Orientation::Horizontal, s(10));
         delete_toast.add_css_class("edge-delete-toast");
@@ -655,7 +652,6 @@ impl Strip {
             strip_bounds: Cell::new((0, 0, 0, 0)),
             panel_bounds: Cell::new((0, 0, 0, 0)),
             stack,
-            marker,
             tabs,
             edge_search,
             search_popover,
@@ -687,7 +683,7 @@ impl Strip {
             pending_motion: Cell::new(None),
             deferred_hide: Cell::new(None),
             refresh_pending: Cell::new(false),
-            marker_bounds: Cell::new((0, 0, 0, 0)),
+            trigger_bounds: Cell::new((0, 0, 0, 0)),
             tab_hover: RefCell::new(Vec::new()),
             strip_motion: motion::Motion::new(0.),
             panel_motion: motion::Motion::new(0.),
@@ -724,7 +720,6 @@ impl Strip {
     }
     fn apply(&self, effects: Effects) {
         let moving = self.strip_phase.get() != StripPhase::Settled;
-        self.marker.set_visible(false);
         self.tabs.set_visible(effects.tabs_visible || moving);
         if let Some(panel) = effects.panel {
             self.stack.set_visible_child_name(panel);
@@ -1063,7 +1058,6 @@ impl Ui {
     }
     fn paint_strip(&self, progress: f64) {
         self.paint_hover_tabs();
-        self.edge.marker.set_opacity(1. - progress);
         if let Some(utilities) = self.edge.tabs.last_child() {
             utilities.set_opacity(progress);
         }
@@ -1109,10 +1103,9 @@ impl Ui {
         }
         self.edge.strip_motion.jump(progress);
         self.paint_strip(progress);
-        self.edge.marker.set_visible(false);
         self.edge.tabs.set_visible(revealed);
         if !revealed {
-            self.edge.strip_bounds.set(self.edge.marker_bounds.get());
+            self.edge.strip_bounds.set(self.edge.trigger_bounds.get());
             self.edge.strip_offset.set(None);
         }
         self.set_input();
@@ -1950,9 +1943,6 @@ impl Ui {
         while let Some(child) = self.edge.tabs.first_child() {
             self.edge.tabs.remove(&child);
         }
-        while let Some(child) = self.edge.marker.first_child() {
-            self.edge.marker.remove(&child);
-        }
         let config = self.config.borrow().clone();
         let notes = match self
             .storage
@@ -1974,11 +1964,11 @@ impl Ui {
             gtk::Orientation::Vertical
         };
         self.edge.tabs.set_orientation(orientation);
-        self.edge.marker.set_orientation(orientation);
         let s = crate::edge_surface::scale_px;
         let depth = s(26);
         // Measure the upright titles, but cap their contribution so a long title
         // cannot widen the whole strip. Both orientations use a slim 24px depth.
+        // 标签固定长度：初始居中，数量增加时向两侧生长；占满后由 deck_gap 产生重叠。
         // Fixed tab length. The group starts centered and grows toward both
         // ends as notes are added; once the edge is full, the gap becomes more
         // negative so the tabs overlap instead of shrinking or stretching.
@@ -2030,6 +2020,7 @@ impl Ui {
                 (notes.len() as i32 * (tab_height + gap) - gap + inset).max(0)
             },
         );
+        // 文档式标签：细色线标识便签颜色，当前打开的便签提高不透明度并加 active 背景。
         let active = self.edge.state().docked_id();
         for (index, note) in notes.iter().enumerate() {
             let is_active = active == Some(note.id);
@@ -2791,6 +2782,8 @@ impl Ui {
         };
         // Measure without placement margins, which otherwise feed back into size.
         position(self.edge.tabs.upcast_ref(), tx, ty);
+        // 收起态不再绘制任何触发图标；整条屏幕边缘都是不可见热区。
+        // 深度按屏幕边缘长度自动缩放，长度则始终覆盖整条边。
         // Dormant state has no visible trigger. The whole screen edge is the
         // hover/click target, so keep a full-length strip of input there.
         let edge_length = if horizontal {
@@ -2818,7 +2811,7 @@ impl Ui {
                 trigger_depth,
             ),
         };
-        self.edge.marker_bounds.set(trigger);
+        self.edge.trigger_bounds.set(trigger);
         self.edge.strip_bounds.set(
             if effects.strip_input == StripInput::Tabs
                 || self.edge.strip_phase.get() == StripPhase::Collapsing
@@ -3427,7 +3420,7 @@ mod tests {
         let id = NoteId::new(1);
         let (state, effects) = transition(EdgeState::Dormant, EdgeEvent::Reveal, policy());
         assert_eq!(state, EdgeState::Tabs);
-        assert!(!effects.marker_visible && effects.tabs_visible);
+        assert!(effects.tabs_visible);
         assert_eq!(effects.strip_input, StripInput::Tabs);
         assert!(!effects.panel_input);
         assert_eq!(effects.strip_keyboard, KeyboardMode::OnDemand);
@@ -3450,7 +3443,7 @@ mod tests {
         assert_eq!(effects.panel, None);
         let (state, effects) = transition(state, EdgeEvent::Collapse, policy());
         assert_eq!(state, EdgeState::Dormant);
-        assert!(!effects.marker_visible && !effects.tabs_visible);
+        assert!(!effects.tabs_visible);
         assert_eq!(effects.strip_input, StripInput::Edge);
         assert!(!effects.panel_input && !effects.pointer_visible);
         assert_eq!(effects.strip_keyboard, KeyboardMode::None);
@@ -3493,7 +3486,6 @@ mod tests {
             );
             let (state, effects) = transition(state, EdgeEvent::FinishReposition, policy());
             assert_eq!(state, EdgeState::Dormant);
-            assert!(!effects.marker_visible);
             assert!(!effects.tabs_visible && !effects.panel_input);
         }
     }
@@ -3586,7 +3578,6 @@ mod tests {
         let settings = gtk::Settings::default().unwrap();
         settings.set_gtk_enable_animations(true);
         Config {
-            launch_at_login: false,
             ..Config::default()
         }
         .save(&config::config_path())
@@ -3628,10 +3619,10 @@ mod tests {
         };
         settle(250);
         assert!(ui.motion_enabled());
-        // The dormant marker must keep the same placement on its first reveal.
-        let marker = ui.edge.marker_bounds.get();
+        // The dormant trigger must keep the same placement on first reveal.
+        let trigger = ui.edge.trigger_bounds.get();
         ui.reveal();
-        assert_eq!(ui.edge.marker_bounds.get(), marker);
+        assert_eq!(ui.edge.trigger_bounds.get(), trigger);
         assert_eq!(ui.edge.tabs.last_child().unwrap().opacity(), 0.);
         // Sample the first reveal, including GTK's first tab allocations.
         let extent = (ui.edge.root.width(), ui.edge.root.height());
@@ -3698,7 +3689,7 @@ mod tests {
         assert_eq!(ui.edge.strip_phase.get(), StripPhase::Settled);
         ui.dormant();
         settle(200);
-        assert_eq!(ui.edge.strip_bounds.get(), ui.edge.marker_bounds.get());
+        assert_eq!(ui.edge.strip_bounds.get(), ui.edge.trigger_bounds.get());
         assert!(!ui.edge.tabs.is_visible());
         ui.schedule_reveal();
         settle(185);
@@ -3834,7 +3825,7 @@ mod tests {
         ui.reveal();
         assert_eq!(ui.edge.strip_phase.get(), StripPhase::Settled);
         ui.dormant();
-        assert_eq!(ui.edge.strip_bounds.get(), ui.edge.marker_bounds.get());
+        assert_eq!(ui.edge.strip_bounds.get(), ui.edge.trigger_bounds.get());
         ui.config.borrow_mut().reduced_motion = false;
         settings.set_gtk_enable_animations(false);
         ui.reveal();
@@ -3869,7 +3860,6 @@ mod tests {
             .unwrap()
             .set_gtk_enable_animations(true);
         Config {
-            launch_at_login: false,
             ..Config::default()
         }
         .save(&config::config_path())
@@ -4312,21 +4302,6 @@ mod feedback_tests {
                 ui.change_settings(config).unwrap();
                 ui.dormant();
                 settle();
-                assert!(
-                    ui.edge
-                        .marker
-                        .first_child()
-                        .unwrap()
-                        .has_css_class("marker-line")
-                );
-                assert!(
-                    ui.edge
-                        .marker
-                        .first_child()
-                        .unwrap()
-                        .next_sibling()
-                        .is_none()
-                );
                 ui.reveal();
                 settle();
                 let fixed = ui

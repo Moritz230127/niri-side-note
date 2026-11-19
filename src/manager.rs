@@ -338,7 +338,7 @@ impl ManagerUi {
         } else if archived {
             "归档的便签会显示在这里。"
         } else if !self.has_saved_notes.get() {
-            "Create your first note.\nClick the edge marker to reach your notes anytime."
+            "创建第一条便签。\n随时把鼠标移到屏幕边缘即可打开便签条。"
         } else {
             "新建便签，或切换到“全部”查看归档。"
         });

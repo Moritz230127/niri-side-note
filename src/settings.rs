@@ -455,6 +455,7 @@ pub fn build(
     root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     root.append(&motion_row);
     let mut extras: Vec<Box<dyn Fn()>> = Vec::new();
+    // 行为区目前只有一个开关；保留统一注册逻辑，后续增加开关时无需改刷新路径。
     for (label, read, write) in std::iter::once((
         "悬停展开",
         (|c: &Config| c.edge_hover_enabled) as fn(&Config) -> bool,
@@ -527,6 +528,8 @@ pub fn build(
     }
 }
 
+/// 屏幕选择按钮同时提供可见标题、tooltip 和 Accessibility Label，
+/// 这样鼠标、键盘和 AT-SPI 测试都能识别同一个目标。
 fn screen_button(label: &str, group: Option<&gtk::ToggleButton>) -> gtk::ToggleButton {
     let button = gtk::ToggleButton::new();
     let text = gtk::Label::new(Some(label));
@@ -540,6 +543,8 @@ fn screen_button(label: &str, group: Option<&gtk::ToggleButton>) -> gtk::ToggleB
     button
 }
 
+/// 枚举当前 GDK 显示器；connector 作为持久配置值，None 表示自动选择第一块。
+/// 配置里的屏幕已断开时保留一个「未连接」选项，避免用户丢失选择。
 fn screen_choices(current: Option<&str>) -> (gtk::Box, Vec<(gtk::ToggleButton, Option<String>)>) {
     let list = gtk::Box::new(gtk::Orientation::Vertical, 4);
     list.add_css_class("segments");

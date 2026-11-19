@@ -75,14 +75,6 @@ pub enum TabLayout {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum MarkerStyle {
-    Dots,
-    #[default]
-    Bar,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "lowercase")]
 pub enum Font {
     #[default]
     Theme,
@@ -116,7 +108,7 @@ impl LegacyTextWeight {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)] // Unknown legacy keys are ignored so old configs keep loading.
 pub struct NoteStyle {
     pub font: Option<Font>,
     pub text_size: NoteTextSize,
@@ -147,14 +139,18 @@ impl NoteStyle {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)] // Unknown legacy keys are ignored so old configs keep loading.
+/// 本分支只保存中文界面所需的设置。
+/// 未知的旧版本键会被忽略，避免升级时因遗留键导致配置无法加载。
 pub struct Config {
+    /// 贴边方向。
     pub edge: ScreenEdge,
+    /// 目标显示器的 GDK connector，例如 `HDMI-A-1`；None 表示第一块屏幕。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub monitor: Option<String>,
+    /// 沿屏幕边缘的位置（0..1）。键名沿用旧版 `marker_offset` 以兼容配置。
     pub marker_offset: f64,
     pub edge_hover_enabled: bool,
-    pub launch_at_login: bool,
     pub theme: Theme,
     pub playful_edges: PlayfulEdges,
     pub appearance: Appearance,
@@ -168,8 +164,6 @@ pub struct Config {
     pub paper: Paper,
     pub shape: Shape,
     pub tab_layout: TabLayout,
-    pub marker_style: MarkerStyle,
-    pub visible_notes: usize,
     pub inactivity_seconds: u64,
     pub reduced_motion: bool,
     pub hide_in_fullscreen: bool,
@@ -185,7 +179,6 @@ impl Default for Config {
             monitor: None,
             marker_offset: 0.5,
             edge_hover_enabled: true,
-            launch_at_login: false,
             theme: Theme::Paper,
             playful_edges: PlayfulEdges::Wavy,
             appearance: Appearance::System,
@@ -194,8 +187,6 @@ impl Default for Config {
             paper: Paper::Plain,
             shape: Shape::Ticket,
             tab_layout: TabLayout::Stacked,
-            marker_style: MarkerStyle::Bar,
-            visible_notes: 4,
             inactivity_seconds: 120,
             reduced_motion: false,
             hide_in_fullscreen: true,
@@ -261,9 +252,6 @@ impl Config {
     fn validate(&self) -> Result<(), ConfigError> {
         if !self.marker_offset.is_finite() || !(0.0..=1.0).contains(&self.marker_offset) {
             return Err(ConfigError::InvalidMarkerOffset(self.marker_offset));
-        }
-        if !matches!(self.visible_notes, 4 | 5) {
-            return Err(ConfigError::InvalidValue("visible_notes must be 4 or 5"));
         }
         if !matches!(self.inactivity_seconds, 0 | 60 | 120 | 300) {
             return Err(ConfigError::InvalidValue(
@@ -385,26 +373,17 @@ mod tests {
             paper: Paper::Plain,
             shape: Shape::Ticket,
             tab_layout: TabLayout::Classic,
-            marker_style: MarkerStyle::Dots,
-            visible_notes: 4,
             inactivity_seconds: 60,
             ..Config::default()
         };
         config.validate().unwrap();
         let text = toml::to_string(&config).unwrap();
         assert_eq!(toml::from_str::<Config>(&text).unwrap(), config);
-        for invalid in [
-            Config {
-                visible_notes: 6,
-                ..config.clone()
-            },
-            Config {
-                inactivity_seconds: 30,
-                ..config.clone()
-            },
-        ] {
-            assert!(invalid.validate().is_err());
-        }
+        let invalid = Config {
+            inactivity_seconds: 30,
+            ..config.clone()
+        };
+        assert!(invalid.validate().is_err());
         let style: NoteStyle = toml::from_str("font = 'mono'").unwrap();
         assert_eq!(style.font, Some(Font::Mono));
         assert_eq!(style.text_size, NoteTextSize::Medium);
@@ -440,9 +419,8 @@ mod tests {
         let saved = fs::read_to_string(&path).unwrap();
         assert!(!saved.contains("white_paper"));
         assert_eq!(config.tab_layout, TabLayout::Classic);
-        assert_eq!(config.marker_style, MarkerStyle::Dots);
         assert!(saved.contains("tab_layout"));
-        assert!(saved.contains("marker_style"));
+        assert!(!saved.contains("marker_style"));
         assert_eq!(Config::load(&path).unwrap(), config);
         fs::remove_dir_all(directory).unwrap();
     }
@@ -490,7 +468,6 @@ mod tests {
             edge: ScreenEdge::Left,
             marker_offset: 0.25,
             edge_hover_enabled: false,
-            launch_at_login: true,
             ..Config::default()
         };
 
@@ -515,14 +492,13 @@ mod tests {
         assert_eq!(config.edge, ScreenEdge::Top);
         assert_eq!(config.marker_offset, 0.5);
         assert!(config.edge_hover_enabled);
-        assert!(!config.launch_at_login);
         assert_eq!(config.inactivity_seconds, 120);
 
         fs::remove_dir_all(directory).expect("test directory should be removable");
     }
 
     #[test]
-    fn invalid_values_and_unknown_keys_are_rejected() {
+    fn invalid_values_are_rejected_and_unknown_keys_are_ignored() {
         let directory = test_directory("invalid");
         let path = directory.join("config.toml");
         fs::create_dir_all(&directory).expect("test directory should be created");
@@ -533,9 +509,13 @@ mod tests {
         ));
 
         fs::write(&path, "future_setting = true\n").expect("test configuration should be written");
-        assert!(matches!(Config::load(&path), Err(ConfigError::Parse(_))));
+        // Unknown keys from older releases are ignored so upgrades keep loading.
         assert_eq!(
-            fs::read_to_string(&path).expect("invalid configuration should remain readable"),
+            Config::load(&path).expect("unknown keys should be ignored"),
+            Config::default()
+        );
+        assert_eq!(
+            fs::read_to_string(&path).expect("configuration should remain readable"),
             "future_setting = true\n"
         );
 

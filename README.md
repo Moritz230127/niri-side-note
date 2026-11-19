@@ -1,3 +1,5 @@
+> **本地分支说明**：本仓库是中文单语本地分支，已移除应用内开机自启、点/线触发器和可见便签数设置；屏幕选择、贴边方向和中文界面说明见 [FORK.md](FORK.md)。
+
 # Stickies
 
 Stickies is a local scratchpad for Windows and Linux Wayland desktops with Layer Shell v4+ and compatible native libraries. It lives at the screen edge for thoughts that are too small to justify opening a full notes application.

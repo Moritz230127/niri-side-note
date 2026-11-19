@@ -175,16 +175,6 @@
 .edge-window.edge-minimal-dark.edge-bottom .edge-utilities { background-color: #22252C; }
 .edge-window.edge-minimal-dark.edge-bottom .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#F0F0EE, .10); }
 
-/* The marker is a single line with its larger hit area handled in Rust. */
-.edge-window .edge-marker {
-  padding: 0; margin: 0; min-width: 0; min-height: 0;
-  border: none; border-radius: 0; background: transparent; box-shadow: none;
-}
-.edge-window .edge-marker .marker-line {
-  background: #88847d; border-radius: 2px; border: none; box-shadow: 0 0 3px alpha(black, .3);
-}
-.edge-window.edge-minimal-dark .edge-marker .marker-line { background: #ccc8c0; }
-
 /* The deletion toast shares the strip surface and the edge utility chrome. */
 .edge-window .edge-delete-toast { background: #F6EFDB; color: #2A2723; font-family: Inter, sans-serif; font-size: 13px; border: 1px solid alpha(#2A2723, .16); border-radius: 9px; padding: 6px 10px; box-shadow: 0 2px 4px alpha(black, .18); }
 .edge-window.edge-playful .edge-delete-toast { background: #ffffff; }
@@ -192,10 +182,8 @@
 .edge-window.edge-minimal-dark .edge-delete-toast { background: #22252C; color: #F0F0EE; border-color: alpha(#F0F0EE, .16); box-shadow: 0 2px 4px alpha(black, .35); }
 .edge-window .edge-delete-toast button { background: transparent; color: inherit; border: none; box-shadow: none; padding: 4px 6px; min-height: 22px; border-radius: 5px; font-size: 13px; }
 
-.edge-window .edge-marker .marker-pill { min-width: 0; min-height: 0; border-radius: 3px; box-shadow: none; }
 /* Thin inner accent keeps document tabs recognisable without heavy chrome. */
 .edge-window .edge-accent-line { border-radius: 2px; }
-.edge-window .edge-marker .marker-pill:not(.edge-result-color) { background: #88847d; }
 
 /* Classic reveals one continuous tab from off screen; no shadow seam. */
 .edge-window.edge-classic .tab-title { font-weight: 500; letter-spacing: 0; }
