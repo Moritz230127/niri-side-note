@@ -534,7 +534,15 @@ impl Strip {
             window.set_anchor(Edge::Bottom, false);
         }
         let strip_root = gtk::Overlay::new();
-        strip_root.set_child(Some(&gtk::Box::new(gtk::Orientation::Vertical, 0)));
+        // 收起态也必须绘制一个透明缓冲区，否则 layer surface 只有 commit、没有
+        // attach，合成器不会把它当作可交互表面，鼠标悬停热区完全失效。
+        let strip_hit_area = gtk::DrawingArea::new();
+        strip_hit_area.set_draw_func(|_, cr, _, _| {
+            cr.set_operator(gtk::cairo::Operator::Clear);
+            let _ = cr.paint();
+        });
+        strip_hit_area.add_css_class("hit-area");
+        strip_root.set_child(Some(&strip_hit_area));
         let root = gtk::Overlay::new();
         // Keep a transparent render node even when the last panel is hidden.
         // An empty snapshot can leave the previous buffer visible on the compositor.

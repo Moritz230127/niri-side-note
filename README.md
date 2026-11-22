@@ -14,7 +14,7 @@
 <p align="center"><strong>贴边便签，安静地待在屏幕边缘。</strong><br>
 整条选定边框都是热区；鼠标靠近展开，点开即可写，离开自动收回。</p>
 
-> 基于 [0atxl/stickies](https://github.com/0atxl/stickies) `0.10.3` 的非官方简体中文分支，当前版本 **v0.11.0-niri.1**，遵循 **MPL-2.0**。
+> 基于 [0atxl/stickies](https://github.com/0atxl/stickies) `0.10.3` 的非官方简体中文分支，当前版本 **v0.11.0-niri.2**，遵循 **MPL-2.0**。
 
 ---
 
@@ -197,7 +197,7 @@ cargo test --locked
 - 本项目是 [0atxl/stickies](https://github.com/0atxl/stickies) 的**非官方**简体中文分支，与上游无隶属关系。
 - 本分支的主要差异：中文单语化、手动选屏、整边触发、圆角标签、按需映射的贴边面板，以及针对 niri 的键盘焦点 / 尺寸 / 退出稳定性修复。
 - 上游版权归其贡献者所有；本分支的修改同样以 MPL-2.0 公开，完整对应源码见本仓库。
-- 发布说明：[v0.11.0-niri.1](packaging/releases/v0.11.0.md) · [全部版本](https://github.com/Moritz230127/niri-side-note/releases)
+- 发布说明：[v0.11.0-niri.2](packaging/releases/v0.11.0-niri.2.md) · [全部版本](https://github.com/Moritz230127/niri-side-note/releases)
 
 ## 已知限制
 
