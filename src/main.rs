@@ -29,6 +29,7 @@ mod ui_assets;
 
 #[cfg(test)]
 use crate::edge_surface::{Layer, LayerShell};
+use adw::prelude::*;
 #[cfg(test)]
 use app::NoteColor;
 use app::{Action, AppState, NoteId};
@@ -36,7 +37,7 @@ use config::Config;
 #[cfg(test)]
 use config::ScreenEdge;
 use edge::{EdgeEvent, EdgeState};
-use gtk::{glib, prelude::*};
+use gtk::glib;
 #[cfg(test)]
 use std::time::Duration;
 use std::{
@@ -100,48 +101,55 @@ impl Ui {
         }
     }
 
-    fn request_quit(&self) {
+    fn request_quit(self: &Rc<Self>) {
         let errors = self.flush_sessions();
         let Some((id, _)) = errors.first() else {
             self.application.quit();
             return;
         };
-        // Keep all sessions and views alive. Own the dialog with the failed
-        // editor so a topmost docked note cannot cover the save failure.
-        let parent: gtk::Window = if self.edge.state().docked_id() == Some(*id) {
-            self.edge.window.clone().upcast()
-        } else if let Some(note) = self.separate.borrow().get(id) {
-            note.window.clone().upcast()
-        } else if let Some(manager) = self.manager.borrow().as_ref() {
-            manager.window().clone().upcast()
-        } else {
-            self.edge.window.clone().upcast()
-        };
+        let _ = id;
+        // 不用 layer surface 当父窗口：Wayland 下它没有真正的 transient/modal 语义，
+        // 对话框可能被贴边面板盖住，导致用户以为“退出没反应”。
+        let parent: Option<gtk::Window> = self
+            .manager
+            .borrow()
+            .as_ref()
+            .map(|manager| manager.window().clone().upcast())
+            .or_else(|| {
+                self.separate
+                    .borrow()
+                    .values()
+                    .next()
+                    .map(|note| note.window.clone().upcast())
+            });
         let details = errors
             .into_iter()
             .map(|(id, error)| format!("便签 {}：{error}", id.value()))
             .collect::<Vec<_>>()
             .join("\n");
-        let dialog = gtk::AlertDialog::builder()
-            .modal(true)
-            .message("Niri 侧笺 无法保存你的便签")
-            .detail(format!(
-                "你的编辑仍未保存。请解决保存错误后再退出。\n\n{details}"
+        let dialog = adw::AlertDialog::builder()
+            .heading("无法保存便签")
+            .body(format!(
+                "以下便签没有保存成功：\n\n{details}\n\n可以取消后重试，或放弃未保存的修改直接退出。"
             ))
             .build();
-        let hold = self.application.hold();
-        let cancellable = gtk::gio::Cancellable::new();
-        let cancel = cancellable.clone();
-        let destroy = parent.connect_destroy(move |_| cancel.cancel());
-        let weak_parent = parent.downgrade();
-        // Close, Escape and cancellation only dismiss this alert. Quit must be
-        // requested again and every save must succeed before we can exit.
-        dialog.choose(Some(&parent), Some(&cancellable), move |_| {
-            if let Some(parent) = weak_parent.upgrade() {
-                parent.disconnect(destroy);
+        dialog.add_response("cancel", "取消");
+        dialog.add_response("discard", "放弃修改并退出");
+        dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let hold = RefCell::new(Some(self.application.hold()));
+        let ui = self.clone();
+        dialog.connect_response(None, move |_, response| {
+            if response == "discard" {
+                ui.sessions.borrow_mut().clear();
+                ui.application.quit();
             }
-            drop(hold);
+            if let Some(guard) = hold.borrow_mut().take() {
+                drop(guard);
+            }
         });
+        dialog.present(parent.as_ref());
     }
 
     fn register_actions(self: &Rc<Self>) {
@@ -757,7 +765,30 @@ fn main() -> glib::ExitCode {
     // running again while an unparented storage error is awaiting dismissal.
     let startup_error_pending = Rc::new(Cell::new(false));
     let pending = startup_error_pending.clone();
+    // 用 Weak 记录已经构建的 UI：再次启动时必须有可见反馈。
+    let live_ui: Rc<RefCell<Option<std::rc::Weak<Ui>>>> = Rc::new(RefCell::new(None));
+    // 带动作的二次启动（--new-note / --toggle-strip 等）由 command_line 自己处理，
+    // 不要在这里先 reveal，否则 --toggle-strip 会变成“展开又立刻收起”。
+    let suppress_activate_reveal = Rc::new(Cell::new(false));
+    let suppress_for_activate = suppress_activate_reveal.clone();
+    let ui_for_activate = live_ui.clone();
     application.connect_activate(move |application| {
+        if let Some(ui) = ui_for_activate
+            .borrow()
+            .as_ref()
+            .and_then(std::rc::Weak::upgrade)
+        {
+            if suppress_for_activate.get() {
+                return;
+            }
+            // 已在运行：把“全部便签”窗口或贴边条叫回前台。
+            if let Some(manager) = ui.manager.borrow().as_ref() {
+                manager.present();
+            } else {
+                ui.reveal();
+            }
+            return;
+        }
         if application.windows().is_empty() && !pending.get() {
             if let Err(error) = adw::init() {
                 eprintln!("无法初始化桌面界面：{error}");
@@ -770,7 +801,9 @@ fn main() -> glib::ExitCode {
                 application.quit();
                 return;
             }
-            build(application, &pending);
+            if let Some(ui) = build(application, &pending) {
+                *ui_for_activate.borrow_mut() = Some(Rc::downgrade(&ui));
+            }
         }
     });
     application.connect_command_line(move |application, command_line| {
@@ -782,15 +815,23 @@ fn main() -> glib::ExitCode {
             }
         };
         // GApplication delivers this signal to the primary process over D-Bus.
-        application.activate();
+        // 带动作的请求由动作本身决定可见状态；裸启动则把贴边条叫回来，
+        // 这样“再点一次桌面图标”一定有可见反馈。
         if let Some(name) = action {
+            let suppress = suppress_activate_reveal.clone();
+            suppress.set(true);
+            application.activate();
+            suppress.set(false);
             if application.lookup_action(name).is_none() {
                 eprintln!("Niri 侧笺 无法执行请求的操作。");
                 return glib::ExitCode::FAILURE;
             }
             application.activate_action(name, None);
-        } else if application.windows().is_empty() && !startup_error_pending.get() {
-            return glib::ExitCode::FAILURE;
+        } else {
+            application.activate();
+            if application.windows().is_empty() && !startup_error_pending.get() {
+                return glib::ExitCode::FAILURE;
+            }
         }
         glib::ExitCode::SUCCESS
     });

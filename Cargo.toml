@@ -1,9 +1,9 @@
 [package]
 name = "stickies"
-version = "0.10.3"
+version = "0.11.0"
 edition = "2024"
 rust-version = "1.92"
-description = "Niri 侧笺：Simplified Chinese edge sticky notes for Wayland (unofficial fork)"
+description = "Niri 侧笺：Wayland 贴边便签（简体中文，非官方分支）"
 license = "MPL-2.0"
 repository = "https://github.com/Moritz230127/niri-side-note"
 readme = "README.md"

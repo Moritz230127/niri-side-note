@@ -1,230 +1,121 @@
-/* Edge chrome. Load after the app CSS.
- * Tabs and utilities stay 24px deep, with rounded free corners and a square
- * screen edge. Transparent 1px tab borders preserve the label allocation.
- * Tabs keep their resting appearance when focused or selected.
- * GtkWidget::set_overflow clips the utility cells to their capsule.
- * Motion is handled in Rust.
+/* 贴边条外观：简洁、圆角、中文界面。
+ *
+ * 设计约定：
+ * - 便签标签离开屏幕边缘 4px，四个角全部圆角，填充便签自身的颜色。
+ * - 当前打开的便签用白色描边 + 更明显的阴影表示，不改变文字颜色。
+ * - 新建 / 搜索 / 全部便签共用一个圆角胶囊，避免细碎边框。
+ * - 所有尺寸在 Rust 里按屏幕缩放算好，这里只负责颜色与圆角。
  */
-/* ---- shared ---- */
-.edge-window .tab-title { font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; } /* letter-spacing optional: delete if GTK warns */
-.edge-window .edge-utilities { padding: 0; /* Clipped with GtkWidget::set_overflow(Hidden). */ }
-.edge-window .strip-control { background: transparent; border: none; border-radius: 0; padding: 0; min-width: 24px; min-height: 24px; box-shadow: none; }
-/* Hover/press feedback comes from motion; keep the fill clear. */
-.edge-window button.note-tab:hover, .edge-window button.note-tab:active { background-image: none; }
 
-
-/* ======== paper ======== */
-.edge-window.edge-paper .strip-control { color: #2A2723; }
-.edge-window.edge-paper .edge-result-color { box-shadow: 0 0 0 1px rgba(42,39,35,.20); }
-/* paper / right */
-.edge-window.edge-paper.edge-right .edge-utilities {
-  border: none; border-radius: 9px 0 0 9px;
-  box-shadow: -2px 0 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-right button.note-tab {
-  border: 1px solid transparent; border-radius: 9px 0 0 9px;
-  box-shadow: -2px 0 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-right .edge-utilities { background-color: #F6EFDB; }
-.edge-window.edge-paper.edge-right .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#2A2723, .10); }
-/* paper / left */
-.edge-window.edge-paper.edge-left .edge-utilities {
-  border: none; border-radius: 0 9px 9px 0;
-  box-shadow: 2px 0 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-left button.note-tab {
-  border: 1px solid transparent; border-radius: 0 9px 9px 0;
-  box-shadow: 2px 0 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-left .edge-utilities { background-color: #F6EFDB; }
-.edge-window.edge-paper.edge-left .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#2A2723, .10); }
-/* paper / top */
-.edge-window.edge-paper.edge-top .edge-utilities {
-  border: none; border-radius: 0 0 9px 9px;
-  box-shadow: 0 2px 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-top button.note-tab {
-  border: 1px solid transparent; border-radius: 0 0 9px 9px;
-  box-shadow: 0 2px 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-top .edge-utilities { background-color: #F6EFDB; }
-.edge-window.edge-paper.edge-top .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#2A2723, .10); }
-/* paper / bottom */
-.edge-window.edge-paper.edge-bottom .edge-utilities {
-  border: none; border-radius: 9px 9px 0 0;
-  box-shadow: 0 -2px 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-bottom button.note-tab {
-  border: 1px solid transparent; border-radius: 9px 9px 0 0;
-  box-shadow: 0 -2px 4px rgba(30,25,15,.18); }
-.edge-window.edge-paper.edge-bottom .edge-utilities { background-color: #F6EFDB; }
-.edge-window.edge-paper.edge-bottom .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#2A2723, .10); }
-
-/* ======== playful ======== */
-.edge-window.edge-playful .strip-control { color: #2A2723; }
-.edge-window.edge-playful .edge-result-color { box-shadow: 0 0 0 1.5px #2A2723; }
-/* playful / right */
-.edge-window.edge-playful.edge-right .edge-utilities {
-  border: none; border-radius: 9px 0 0 9px;
-  box-shadow: -2px 0 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-right button.note-tab {
-  border: 1px solid transparent; border-radius: 9px 0 0 9px;
-  box-shadow: -2px 0 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-right .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-playful.edge-right .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#2A2723, .10); }
-/* playful / left */
-.edge-window.edge-playful.edge-left .edge-utilities {
-  border: none; border-radius: 0 9px 9px 0;
-  box-shadow: 2px 0 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-left button.note-tab {
-  border: 1px solid transparent; border-radius: 0 9px 9px 0;
-  box-shadow: 2px 0 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-left .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-playful.edge-left .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#2A2723, .10); }
-/* playful / top */
-.edge-window.edge-playful.edge-top .edge-utilities {
-  border: none; border-radius: 0 0 9px 9px;
-  box-shadow: 0 2px 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-top button.note-tab {
-  border: 1px solid transparent; border-radius: 0 0 9px 9px;
-  box-shadow: 0 2px 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-top .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-playful.edge-top .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#2A2723, .10); }
-/* playful / bottom */
-.edge-window.edge-playful.edge-bottom .edge-utilities {
-  border: none; border-radius: 9px 9px 0 0;
-  box-shadow: 0 -2px 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-bottom button.note-tab {
-  border: 1px solid transparent; border-radius: 9px 9px 0 0;
-  box-shadow: 0 -2px 4px rgba(42,39,35,.22); }
-.edge-window.edge-playful.edge-bottom .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-playful.edge-bottom .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#2A2723, .10); }
-
-/* ======== minimal ======== */
-.edge-window.edge-minimal .strip-control { color: #23262B; }
-.edge-window.edge-minimal .edge-result-color { box-shadow: 0 0 0 1px rgba(35,38,43,.18); }
-.edge-window.edge-minimal button.note-tab { background-color: #FFFFFF; color: #23262B; }
-/* minimal / right */
-.edge-window.edge-minimal.edge-right .edge-utilities {
-  border: none; border-radius: 9px 0 0 9px;
-  box-shadow: -2px 0 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-right button.note-tab {
-  border: 1px solid transparent; border-left-color: var(--edge-accent); border-radius: 9px 0 0 9px;
-  box-shadow: inset 2px 0 0 var(--edge-accent), -2px 0 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-right .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-minimal.edge-right .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#23262B, .10); }
-/* minimal / left */
-.edge-window.edge-minimal.edge-left .edge-utilities {
-  border: none; border-radius: 0 9px 9px 0;
-  box-shadow: 2px 0 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-left button.note-tab {
-  border: 1px solid transparent; border-right-color: var(--edge-accent); border-radius: 0 9px 9px 0;
-  box-shadow: inset -2px 0 0 var(--edge-accent), 2px 0 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-left .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-minimal.edge-left .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#23262B, .10); }
-/* minimal / top */
-.edge-window.edge-minimal.edge-top .edge-utilities {
-  border: none; border-radius: 0 0 9px 9px;
-  box-shadow: 0 2px 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-top button.note-tab {
-  border: 1px solid transparent; border-bottom-color: var(--edge-accent); border-radius: 0 0 9px 9px;
-  box-shadow: inset 0 -2px 0 var(--edge-accent), 0 2px 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-top .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-minimal.edge-top .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#23262B, .10); }
-/* minimal / bottom */
-.edge-window.edge-minimal.edge-bottom .edge-utilities {
-  border: none; border-radius: 9px 9px 0 0;
-  box-shadow: 0 -2px 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-bottom button.note-tab {
-  border: 1px solid transparent; border-top-color: var(--edge-accent); border-radius: 9px 9px 0 0;
-  box-shadow: inset 0 2px 0 var(--edge-accent), 0 -2px 4px rgba(16,24,40,.18); }
-.edge-window.edge-minimal.edge-bottom .edge-utilities { background-color: #FFFFFF; }
-.edge-window.edge-minimal.edge-bottom .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#23262B, .10); }
-
-/* ======== minimal-dark ======== */
-.edge-window.edge-minimal-dark .strip-control { color: #F0F0EE; }
-.edge-window.edge-minimal-dark .edge-result-color { box-shadow: 0 0 0 1px rgba(255,255,255,.22); }
-.edge-window.edge-minimal-dark button.note-tab { background-color: #22252C; color: #F0F0EE; }
-/* minimal-dark / right */
-.edge-window.edge-minimal-dark.edge-right .edge-utilities {
-  border: none; border-radius: 9px 0 0 9px;
-  box-shadow: -2px 0 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-right button.note-tab {
-  border: 1px solid transparent; border-left-color: var(--edge-accent); border-radius: 9px 0 0 9px;
-  box-shadow: inset 2px 0 0 var(--edge-accent), -2px 0 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-right .edge-utilities { background-color: #22252C; }
-.edge-window.edge-minimal-dark.edge-right .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#F0F0EE, .10); }
-/* minimal-dark / left */
-.edge-window.edge-minimal-dark.edge-left .edge-utilities {
-  border: none; border-radius: 0 9px 9px 0;
-  box-shadow: 2px 0 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-left button.note-tab {
-  border: 1px solid transparent; border-right-color: var(--edge-accent); border-radius: 0 9px 9px 0;
-  box-shadow: inset -2px 0 0 var(--edge-accent), 2px 0 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-left .edge-utilities { background-color: #22252C; }
-.edge-window.edge-minimal-dark.edge-left .strip-control + .strip-control { box-shadow: inset 0 1px 0 alpha(#F0F0EE, .10); }
-/* minimal-dark / top */
-.edge-window.edge-minimal-dark.edge-top .edge-utilities {
-  border: none; border-radius: 0 0 9px 9px;
-  box-shadow: 0 2px 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-top button.note-tab {
-  border: 1px solid transparent; border-bottom-color: var(--edge-accent); border-radius: 0 0 9px 9px;
-  box-shadow: inset 0 -2px 0 var(--edge-accent), 0 2px 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-top .edge-utilities { background-color: #22252C; }
-.edge-window.edge-minimal-dark.edge-top .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#F0F0EE, .10); }
-/* minimal-dark / bottom */
-.edge-window.edge-minimal-dark.edge-bottom .edge-utilities {
-  border: none; border-radius: 9px 9px 0 0;
-  box-shadow: 0 -2px 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-bottom button.note-tab {
-  border: 1px solid transparent; border-top-color: var(--edge-accent); border-radius: 9px 9px 0 0;
-  box-shadow: inset 0 2px 0 var(--edge-accent), 0 -2px 4px rgba(0,0,0,.35); }
-.edge-window.edge-minimal-dark.edge-bottom .edge-utilities { background-color: #22252C; }
-.edge-window.edge-minimal-dark.edge-bottom .strip-control + .strip-control { box-shadow: inset 1px 0 0 alpha(#F0F0EE, .10); }
-
-/* The deletion toast shares the strip surface and the edge utility chrome. */
-.edge-window .edge-delete-toast { background: #F6EFDB; color: #2A2723; font-family: Inter, sans-serif; font-size: 13px; border: 1px solid alpha(#2A2723, .16); border-radius: 9px; padding: 6px 10px; box-shadow: 0 2px 4px alpha(black, .18); }
-.edge-window.edge-playful .edge-delete-toast { background: #ffffff; }
-.edge-window.edge-minimal .edge-delete-toast { background: #ffffff; color: #23262B; }
-.edge-window.edge-minimal-dark .edge-delete-toast { background: #22252C; color: #F0F0EE; border-color: alpha(#F0F0EE, .16); box-shadow: 0 2px 4px alpha(black, .35); }
-.edge-window .edge-delete-toast button { background: transparent; color: inherit; border: none; box-shadow: none; padding: 4px 6px; min-height: 22px; border-radius: 5px; font-size: 13px; }
-
-/* Paper/Playful: the accent follows the tab's rounded silhouette via its border,
-   so there is no separate strip overhanging the corners. */
-.edge-window.edge-paper.edge-right button.note-tab,
-.edge-window.edge-playful.edge-right button.note-tab {
-  border-left-color: var(--edge-accent); border-left-width: 2px; }
-.edge-window.edge-paper.edge-left button.note-tab,
-.edge-window.edge-playful.edge-left button.note-tab {
-  border-right-color: var(--edge-accent); border-right-width: 2px; }
-.edge-window.edge-paper.edge-top button.note-tab,
-.edge-window.edge-playful.edge-top button.note-tab {
-  border-bottom-color: var(--edge-accent); border-bottom-width: 2px; }
-.edge-window.edge-paper.edge-bottom button.note-tab,
-.edge-window.edge-playful.edge-bottom button.note-tab {
-  border-top-color: var(--edge-accent); border-top-width: 2px; }
-
-/* Classic reveals one continuous tab from off screen; no shadow seam. */
-.edge-window.edge-classic .tab-title { font-weight: 500; letter-spacing: 0; }
-/* Shading runs across the tab's depth, with a diffuse shadow at its free edge. */
-.edge-window.edge-classic.edge-right button.note-tab {
-  padding-right: 6px; border-radius: 12px 0 0 12px;
-  background-image: linear-gradient(to right, alpha(white, .18), alpha(white, .03) 55%, alpha(black, .035));
-  box-shadow: inset 1px 1px 2px alpha(white, .24), -2px 2px 7px alpha(black, .14);
+.edge-window .tab-title {
+  font-family: Inter, "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
-.edge-window.edge-classic.edge-left button.note-tab {
-  padding-left: 6px; border-radius: 0 12px 12px 0;
-  background-image: linear-gradient(to left, alpha(white, .18), alpha(white, .03) 55%, alpha(black, .035));
-  box-shadow: inset -1px 1px 2px alpha(white, .24), 2px 2px 7px alpha(black, .14);
+
+/* ---- 便签标签 ---- */
+.edge-window button.note-tab {
+  padding: 0;
+  background-image: none;
+  border: 1px solid rgba(0, 0, 0, .10);
+  border-radius: 11px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, .14);
 }
-.edge-window.edge-classic.edge-top button.note-tab {
-  padding-top: 6px; border-radius: 0 0 12px 12px;
-  background-image: linear-gradient(to top, alpha(white, .18), alpha(white, .03) 55%, alpha(black, .035));
-  box-shadow: inset 1px -1px 2px alpha(white, .24), 0 2px 7px alpha(black, .14);
+.edge-window button.note-tab:hover {
+  border-color: rgba(0, 0, 0, .22);
+  box-shadow: 0 2px 6px rgba(16, 24, 40, .20);
 }
-.edge-window.edge-classic.edge-bottom button.note-tab {
-  padding-bottom: 6px; border-radius: 12px 12px 0 0;
-  background-image: linear-gradient(to bottom, alpha(white, .18), alpha(white, .03) 55%, alpha(black, .035));
-  box-shadow: inset 1px 1px 2px alpha(white, .24), 0 -2px 7px alpha(black, .14);
+.edge-window button.note-tab:active {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .18);
 }
-.edge-window.edge-classic.edge-minimal.edge-right button.note-tab,
-.edge-window.edge-classic.edge-minimal-dark.edge-right button.note-tab { box-shadow: inset 2px 0 var(--edge-accent), -2px 2px 7px alpha(black, .14); }
-.edge-window.edge-classic.edge-minimal.edge-left button.note-tab,
-.edge-window.edge-classic.edge-minimal-dark.edge-left button.note-tab { box-shadow: inset -2px 0 var(--edge-accent), 2px 2px 7px alpha(black, .14); }
-.edge-window.edge-classic.edge-minimal.edge-top button.note-tab,
-.edge-window.edge-classic.edge-minimal-dark.edge-top button.note-tab { box-shadow: inset 0 -2px var(--edge-accent), 0 2px 7px alpha(black, .14); }
-.edge-window.edge-classic.edge-minimal.edge-bottom button.note-tab,
-.edge-window.edge-classic.edge-minimal-dark.edge-bottom button.note-tab { box-shadow: inset 0 2px var(--edge-accent), 0 -2px 7px alpha(black, .14); }
+.edge-window button.note-tab.active {
+  border-color: rgba(255, 255, 255, .90);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .55), 0 3px 8px rgba(16, 24, 40, .26);
+}
+.edge-window.edge-minimal-dark button.note-tab {
+  border-color: rgba(0, 0, 0, .28);
+}
+.edge-window.edge-minimal-dark button.note-tab.active {
+  border-color: rgba(255, 255, 255, .92);
+}
+
+/* ---- 工具胶囊 ---- */
+.edge-window .edge-utilities {
+  padding: 3px;
+  border: 1px solid rgba(0, 0, 0, .08);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, .14);
+}
+.edge-window .strip-control {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.edge-window .strip-control:hover {
+  background: rgba(0, 0, 0, .06);
+}
+.edge-window .strip-control:active {
+  background: rgba(0, 0, 0, .10);
+}
+
+/* ---- 各主题的表面色 ---- */
+.edge-window.edge-paper .edge-utilities {
+  background-color: #F6EFDB;
+  color: #2A2723;
+  border-color: rgba(42, 39, 35, .12);
+}
+.edge-window.edge-playful .edge-utilities {
+  background-color: #FFFFFF;
+  color: #2A2723;
+}
+.edge-window.edge-minimal .edge-utilities {
+  background-color: #FFFFFF;
+  color: #23262B;
+}
+.edge-window.edge-minimal-dark .edge-utilities {
+  background-color: #22252C;
+  color: #F0F0EE;
+  border-color: rgba(255, 255, 255, .10);
+}
+
+/* ---- 删除提示 ---- */
+.edge-window .edge-delete-toast {
+  background: #F6EFDB;
+  color: #2A2723;
+  font-family: Inter, "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+  font-size: 13px;
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: 12px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 6px rgba(16, 24, 40, .18);
+}
+.edge-window.edge-playful .edge-delete-toast {
+  background: #FFFFFF;
+}
+.edge-window.edge-minimal .edge-delete-toast {
+  background: #FFFFFF;
+  color: #23262B;
+}
+.edge-window.edge-minimal-dark .edge-delete-toast {
+  background: #22252C;
+  color: #F0F0EE;
+  border-color: rgba(255, 255, 255, .12);
+}
+.edge-window .edge-delete-toast button {
+  background: transparent;
+  color: inherit;
+  border: none;
+  box-shadow: none;
+  padding: 3px 7px;
+  min-height: 22px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.edge-window .edge-delete-toast button:hover {
+  background: rgba(0, 0, 0, .06);
+}

@@ -213,8 +213,6 @@ pub(super) enum EdgeEvent {
     Refresh,
     FocusWindow,
     FocusStrip,
-    WindowFocused,
-    StripFocused,
     Visibility,
 }
 
@@ -222,8 +220,6 @@ pub(super) enum EdgeEvent {
 struct Policy {
     transient_visible: bool,
     hide_in_fullscreen: bool,
-    window_active: bool,
-    strip_active: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -275,17 +271,16 @@ fn transition(state: EdgeState, event: EdgeEvent, policy: Policy) -> (EdgeState,
     } else {
         Layer::Overlay
     };
-    let mut effects = Effects {
+    let effects = Effects {
         tabs_visible: state.is_revealed(),
         panel,
         pointer_visible: matches!(state, State::Search | State::Docked(_)),
         strip_visible: policy.transient_visible,
-        window_visible: state.docked_id().is_some() || policy.transient_visible,
-        strip_keyboard: if state == State::Tabs {
-            KeyboardMode::OnDemand
-        } else {
-            KeyboardMode::None
-        },
+        // 面板只在真正需要时映射：新 map + OnDemand 才能让 niri 授予键盘焦点，
+        // 同时让 Dormant 时不再有整屏面板 surface 参与合成。
+        window_visible: policy.transient_visible && panel.is_some(),
+        // 便签条只用指针交互，不需要键盘；编辑器/搜索靠面板的新 map 拿焦点。
+        strip_keyboard: KeyboardMode::None,
         window_keyboard: if panel.is_some() {
             KeyboardMode::OnDemand
         } else {
@@ -304,17 +299,10 @@ fn transition(state: EdgeState, event: EdgeEvent, policy: Policy) -> (EdgeState,
             transient_layer
         },
     };
-    match event {
-        Event::FocusWindow if !policy.window_active || state == State::Reposition => {
-            effects.window_keyboard = KeyboardMode::Exclusive
-        }
-        Event::FocusStrip if !policy.strip_active => {
-            effects.strip_keyboard = KeyboardMode::Exclusive
-        }
-        Event::WindowFocused => effects.window_keyboard = KeyboardMode::OnDemand,
-        Event::StripFocused => effects.strip_keyboard = KeyboardMode::OnDemand,
-        _ => (),
-    }
+    // niri 的键盘焦点规则：OnDemand 的 layer surface 在“新映射”或“被点击”时
+    // 才会获得焦点。这里不再使用 Exclusive 抢焦点，也不再自动降级，否则刚拿到
+    // 的焦点会被合成器立刻收回。面板的 map/unmap 由 transition_edge 负责。
+    let _ = event;
     (state, effects)
 }
 
@@ -369,6 +357,7 @@ pub(super) struct Strip {
     undo_delete: gtk::Button,
     toast_note: Cell<Option<NoteId>>,
     toast_bounds: Cell<(i32, i32, i32, i32)>,
+    strip_screen_bounds: Cell<(i32, i32, i32, i32)>,
     toast_timeout: RefCell<Option<glib::SourceId>>,
     toast_motion: motion::Motion,
     toast_generation: Cell<u64>,
@@ -376,6 +365,8 @@ pub(super) struct Strip {
     pub(super) done_reposition: gtk::Button,
     state: Cell<EdgeState>,
     generation: Cell<u64>,
+    input_retry: Cell<u8>,
+    nudging: Cell<bool>,
     reveal_armed: Cell<bool>,
     hide_armed: Cell<bool>,
     pointer_inside_edge: Cell<bool>,
@@ -419,6 +410,7 @@ fn choose_monitor(
     configured: Option<&str>,
     previous: Option<&gtk::gdk::Monitor>,
 ) -> Option<gtk::gdk::Monitor> {
+    // 手动选择的屏幕优先，并且只认 connector 精确匹配。
     if let Some(name) = configured.filter(|name| !name.is_empty())
         && let Some(monitor) = monitors
             .iter()
@@ -426,9 +418,10 @@ fn choose_monitor(
     {
         return Some(monitor.clone());
     }
-    if configured.is_some()
-        && let Some(previous) =
-            previous.filter(|previous| monitors.iter().any(|monitor| monitor == *previous))
+    // 配置的屏幕暂时不可用（或使用“自动”）时，优先留在当前屏幕，
+    // 避免显示器列表顺序变化导致便签条跳到另一块屏。
+    if let Some(previous) =
+        previous.filter(|previous| monitors.iter().any(|monitor| monitor == *previous))
     {
         return Some(previous.clone());
     }
@@ -484,16 +477,36 @@ impl Strip {
             Policy {
                 transient_visible: true,
                 hide_in_fullscreen: false,
-                window_active: false,
-                strip_active: false,
             },
         );
+        // 先选屏幕、再建窗口：把屏幕尺寸作为构造时的默认尺寸，
+        // layer surface 第一次 map 就能拿到正确的 preferred size。
+        let display = gtk::gdk::Display::default();
+        let monitors: Vec<_> = display
+            .as_ref()
+            .map(|display| {
+                display
+                    .monitors()
+                    .iter::<gtk::gdk::Monitor>()
+                    .filter_map(Result::ok)
+                    .filter(usable_monitor)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let monitor = choose_monitor(&monitors, configured_monitor, None);
+        let (screen_width, screen_height) = monitor
+            .as_ref()
+            .map(|monitor| {
+                let geometry = monitor.geometry();
+                (geometry.width().max(1), geometry.height().max(1))
+            })
+            .unwrap_or((WIDTH, HEIGHT));
         let window = gtk::ApplicationWindow::builder()
             .application(application)
             .decorated(false)
             .resizable(false)
-            .default_width(WIDTH)
-            .default_height(HEIGHT)
+            .default_width(screen_width)
+            .default_height(screen_height)
             .build();
         window.add_css_class("edge-window");
         window.init_layer_shell();
@@ -504,20 +517,15 @@ impl Strip {
         let strip_window = gtk::ApplicationWindow::builder()
             .application(application)
             .decorated(false)
-            .resizable(false)
+            .resizable(true)
+            .default_width(screen_width)
+            .default_height(screen_height)
             .build();
         strip_window.add_css_class("edge-window");
         strip_window.init_layer_shell();
         strip_window.set_namespace(Some("stickies-strip"));
         strip_window.set_exclusive_zone(-1);
         strip_window.set_keyboard_mode(initial.strip_keyboard);
-        let monitors: Vec<_> = gtk::prelude::WidgetExt::display(&window)
-            .monitors()
-            .iter::<gtk::gdk::Monitor>()
-            .filter_map(Result::ok)
-            .filter(usable_monitor)
-            .collect();
-        let monitor = choose_monitor(&monitors, configured_monitor, None);
         for window in [&window, &strip_window] {
             window.set_monitor(monitor.as_ref());
             window.set_anchor(Edge::Left, true);
@@ -545,7 +553,7 @@ impl Strip {
         stack.set_transition_duration(0);
         stack.set_visible(initial.panel.is_some());
         let s = crate::edge_surface::scale_px;
-        let tabs = gtk::Box::new(gtk::Orientation::Vertical, s(10));
+        let tabs = gtk::Box::new(gtk::Orientation::Vertical, s(6));
         tabs.set_visible(initial.tabs_visible);
         root.add_overlay(&stack);
         let search_panel = gtk::Box::new(gtk::Orientation::Vertical, s(6));
@@ -623,7 +631,7 @@ impl Strip {
         delete_toast.append(&undo_delete);
         delete_toast.set_visible(false);
         delete_toast.set_opacity(0.);
-        strip_root.add_overlay(&delete_toast);
+        root.add_overlay(&delete_toast);
         let pointer = gtk::DrawingArea::new();
         pointer.set_can_target(false);
         pointer.set_hexpand(true);
@@ -677,6 +685,7 @@ impl Strip {
             undo_delete,
             toast_note: Cell::new(None),
             toast_bounds: Cell::new((0, 0, 0, 0)),
+            strip_screen_bounds: Cell::new((0, 0, 0, 0)),
             toast_timeout: RefCell::new(None),
             toast_motion: motion::Motion::new(0.),
             toast_generation: Cell::new(0),
@@ -684,6 +693,8 @@ impl Strip {
             done_reposition,
             state: Cell::new(EdgeState::Dormant),
             generation: Cell::new(0),
+            input_retry: Cell::new(0),
+            nudging: Cell::new(false),
             reveal_armed: Cell::new(false),
             hide_armed: Cell::new(false),
             pointer_inside_edge: Cell::new(false),
@@ -720,8 +731,6 @@ impl Strip {
         Policy {
             transient_visible: !(config.hide_in_dnd && dnd),
             hide_in_fullscreen: config.hide_in_fullscreen,
-            window_active: self.window.is_active(),
-            strip_active: self.strip_window.is_active(),
         }
     }
     fn effects(&self, config: &Config, dnd: bool) -> Effects {
@@ -745,21 +754,52 @@ impl Strip {
         self.tabs.set_sensitive(effects.panel != Some("reposition"));
         self.strip_root
             .set_cursor_from_name((effects.panel == Some("reposition")).then_some("grab"));
-        self.strip_window
-            .set_layer(if self.toast_note.get().is_some() {
-                Layer::Overlay
-            } else {
-                effects.strip_layer
-            });
-        self.window.set_layer(effects.window_layer);
+        self.strip_window.set_layer(effects.strip_layer);
+        self.window.set_layer(if self.toast_note.get().is_some() {
+            Layer::Overlay
+        } else {
+            effects.window_layer
+        });
         self.strip_window.set_keyboard_mode(effects.strip_keyboard);
-        self.window.set_keyboard_mode(effects.window_keyboard);
+        self.window
+            .set_keyboard_mode(if self.toast_note.get().is_some() {
+                KeyboardMode::None
+            } else {
+                effects.window_keyboard
+            });
     }
 }
 
 impl Ui {
     // Use the sizes that build the strip, before hidden children have their first
     // allocation. Native button padding must not become the reveal's geometry.
+    /// 贴边条表面在“垂直边”方向上的厚度：容纳标签本体 + 圆角阴影。
+    fn strip_cross_depth(&self) -> i32 {
+        // 只比标签本体深一点：整条带子就是所选边框的触发区。
+        crate::edge_surface::scale_px(30)
+    }
+
+    /// 贴边条 surface 的厚度由 anchor + margin 决定（见 place_edge），
+    /// 这里使用同一个目标值排版，避免依赖 GTK 尚未同步的窗口尺寸。
+    fn strip_surface_cross(&self) -> i32 {
+        self.strip_cross_depth()
+    }
+
+    /// 贴边条 layer surface 的实际尺寸（局部坐标系的边界）。
+    fn strip_surface_limits(&self) -> (i32, i32) {
+        let (screen_width, screen_height) = self.note_limits();
+        let horizontal = matches!(
+            self.config.borrow().edge,
+            ScreenEdge::Top | ScreenEdge::Bottom
+        );
+        let cross = self.strip_surface_cross();
+        if horizontal {
+            (screen_width, cross)
+        } else {
+            (cross, screen_height)
+        }
+    }
+
     fn strip_size(&self) -> (i32, i32) {
         let horizontal = matches!(
             self.config.borrow().edge,
@@ -1474,6 +1514,58 @@ impl Ui {
     }
 
     pub(super) fn connect_edge(self: &Rc<Self>) {
+        // 每次 layer surface 新 map 后都重新对齐尺寸与输入区域。
+        // 显示器变化、面板按需显示、DND 恢复都会走这里。
+        for (window, root) in [
+            (&self.edge.window, &self.edge.root),
+            (&self.edge.strip_window, &self.edge.strip_root),
+        ] {
+            let weak = Rc::downgrade(self);
+            let root = root.clone();
+            window.connect_map(move |mapped| {
+                let Some(ui) = weak.upgrade() else {
+                    return;
+                };
+                let mapped_focus = mapped.clone();
+                let mapped = mapped.clone();
+                let weak = Rc::downgrade(&ui);
+                glib::idle_add_local_once(move || {
+                    if let Some(ui) = weak.upgrade() {
+                        ui.place_edge();
+                        // 面板 map 之后 GTK 才有真实的窗口焦点；在 map 前
+                        // grab_focus 会被丢弃，导致打开便签后打字没有反应。
+                        if std::ptr::eq(&mapped_focus, &ui.edge.window) {
+                            if let Some(editor) = ui.edge.docked.borrow().as_ref() {
+                                editor.body.grab_focus();
+                            } else if ui.edge.state().is_searching() {
+                                ui.edge.edge_search.grab_focus();
+                            }
+                        }
+                    }
+                });
+                // configure 可能分几帧到达；多排几次，让标签按实际 surface 厚度贴边。
+                for delay in [400u64, 900u64] {
+                    let weak = Rc::downgrade(&ui);
+                    glib::timeout_add_local_once(Duration::from_millis(delay), move || {
+                        if let Some(ui) = weak.upgrade() {
+                            ui.place_edge();
+                            ui.set_input();
+                        }
+                    });
+                }
+                // gtk4-layer-shell 在 surface 创建时会先发 200×200，而
+                // `resizable(false)` 的窗口在 map 前设置的默认尺寸不会自动生效。
+                // map 后把默认尺寸改 1px 再改回来，强制它重新发送 set_size。
+                let window_clone = mapped.clone();
+                let root_clone = root.clone();
+                let weak = Rc::downgrade(&ui);
+                glib::timeout_add_local_once(Duration::from_millis(120), move || {
+                    if let Some(ui) = weak.upgrade() {
+                        ui.nudge_surface_size(window_clone, root_clone);
+                    }
+                });
+            });
+        }
         let monitors = gtk::prelude::WidgetExt::display(&self.edge.window).monitors();
         let weak = Rc::downgrade(self);
         let handler = monitors.connect_items_changed(move |_, _, _, _| {
@@ -1592,24 +1684,6 @@ impl Ui {
                 }
             }
         });
-        for (window, event) in [
-            (&ui.edge.window, EdgeEvent::WindowFocused),
-            (&ui.edge.strip_window, EdgeEvent::StripFocused),
-        ] {
-            let weak = Rc::downgrade(ui);
-            window.connect_is_active_notify(move |window| {
-                // Request focus only for the explicit opening/closing action. Return
-                // to on-demand immediately so another window can take focus normally.
-                if window.is_active()
-                    && window.keyboard_mode() == KeyboardMode::Exclusive
-                    && let Some(ui) = weak.upgrade()
-                {
-                    ui.transition_edge(event);
-                }
-                // Native popup dismissal handles outside clicks. Pointer focus
-                // changes and the strip/panel handoff do not dismiss search.
-            });
-        }
         let weak = Rc::downgrade(ui);
         ui.edge.pointer.set_draw_func(move |_, cr, _, _| {
             if let Some(ui) = weak.upgrade() {
@@ -1898,37 +1972,36 @@ impl Ui {
             return;
         }
         match event {
-            EdgeEvent::FocusWindow | EdgeEvent::WindowFocused => {
-                self.edge.window.set_keyboard_mode(effects.window_keyboard)
-            }
-            EdgeEvent::FocusStrip | EdgeEvent::StripFocused => self
+            EdgeEvent::FocusWindow => self.edge.window.set_keyboard_mode(effects.window_keyboard),
+            EdgeEvent::FocusStrip => self
                 .edge
                 .strip_window
                 .set_keyboard_mode(effects.strip_keyboard),
             EdgeEvent::Visibility => {
-                self.edge.strip_window.set_visible(
-                    self.edge
-                        .monitor
-                        .borrow()
-                        .as_ref()
-                        .is_some_and(usable_monitor)
-                        && (effects.strip_visible || self.edge.toast_note.get().is_some()),
-                );
+                let monitor_ok = self
+                    .edge
+                    .monitor
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(usable_monitor);
+                // 键盘模式必须在 map 之前确定：niri 只在 surface “新映射”时按
+                // OnDemand 授予焦点，映射后再改模式不会补发焦点。
                 self.edge
                     .strip_window
-                    .set_layer(if self.edge.toast_note.get().is_some() {
-                        Layer::Overlay
-                    } else {
-                        effects.strip_layer
-                    });
-                self.edge.window.set_visible(
-                    self.edge
-                        .monitor
-                        .borrow()
-                        .as_ref()
-                        .is_some_and(usable_monitor)
-                        && effects.window_visible,
-                );
+                    .set_keyboard_mode(effects.strip_keyboard);
+                let toast = self.edge.toast_note.get().is_some();
+                self.edge.window.set_keyboard_mode(if toast {
+                    KeyboardMode::None
+                } else {
+                    effects.window_keyboard
+                });
+                self.edge
+                    .strip_window
+                    .set_visible(monitor_ok && effects.strip_visible);
+                self.edge.strip_window.set_layer(effects.strip_layer);
+                self.edge
+                    .window
+                    .set_visible(monitor_ok && (effects.window_visible || toast));
             }
             _ => self.edge.apply(effects),
         }
@@ -2704,23 +2777,63 @@ impl Ui {
         let effects = self.edge.effects(&config, self.dnd.get());
         let (screen_width, screen_height) = self.note_limits();
         let horizontal = matches!(config.edge, ScreenEdge::Top | ScreenEdge::Bottom);
-        // Both layer surfaces keep their origin and extent across every state.
-        // Only child allocations and their disjoint input regions change.
-        for (window, root) in [
-            (&self.edge.window, &self.edge.root),
-            (&self.edge.strip_window, &self.edge.strip_root),
-        ] {
-            if root.width_request() != screen_width || root.height_request() != screen_height {
-                root.set_size_request(screen_width, screen_height);
-                window.set_default_size(screen_width, screen_height);
-            }
-            crate::edge_surface::sync_surface_geometry(
-                window,
-                self.edge.monitor.borrow().as_ref(),
-                screen_width,
-                screen_height,
-            );
+        let cross = self.strip_surface_cross();
+        // 面板窗口：保持整屏坐标系，按需 map（见 transition 的 window_visible）。
+        if !self.edge.nudging.get()
+            && (self.edge.root.width_request() != screen_width
+                || self.edge.root.height_request() != screen_height)
+        {
+            self.edge.root.set_size_request(screen_width, screen_height);
+            self.edge
+                .window
+                .set_default_size(screen_width, screen_height);
         }
+        crate::edge_surface::sync_surface_geometry(
+            &self.edge.window,
+            self.edge.monitor.borrow().as_ref(),
+            screen_width,
+            screen_height,
+        );
+        // 贴边条窗口：只占所选边的一条带子，沿边由 anchor 拉伸到整条边。
+        // 这样“整条选定边框”天然就是它的输入区域，不再依赖全屏 surface 裁剪。
+        let (strip_width, strip_height) = if horizontal {
+            (screen_width, cross)
+        } else {
+            (cross, screen_height)
+        };
+        // 内容按带子尺寸排版。surface 本身的尺寸由四边 anchor + margin 决定，
+        // 与 GTK 的 preferred size 无关，因此不会卡在 200×200。
+        if !self.edge.nudging.get()
+            && (self.edge.strip_root.width_request() != strip_width
+                || self.edge.strip_root.height_request() != strip_height)
+        {
+            self.edge
+                .strip_root
+                .set_size_request(strip_width, strip_height);
+            self.edge
+                .strip_window
+                .set_default_size(strip_width, strip_height);
+        }
+        let strip_window = &self.edge.strip_window;
+        for edge in [Edge::Left, Edge::Right, Edge::Top, Edge::Bottom] {
+            strip_window.set_anchor(edge, true);
+        }
+        let (margin_left, margin_right, margin_top, margin_bottom) = match config.edge {
+            ScreenEdge::Left => (0, screen_width - cross, 0, 0),
+            ScreenEdge::Right => (screen_width - cross, 0, 0, 0),
+            ScreenEdge::Top => (0, 0, 0, screen_height - cross),
+            ScreenEdge::Bottom => (0, 0, screen_height - cross, 0),
+        };
+        strip_window.set_margin(Edge::Left, margin_left);
+        strip_window.set_margin(Edge::Right, margin_right);
+        strip_window.set_margin(Edge::Top, margin_top);
+        strip_window.set_margin(Edge::Bottom, margin_bottom);
+        crate::edge_surface::sync_surface_geometry(
+            strip_window,
+            self.edge.monitor.borrow().as_ref(),
+            strip_width,
+            strip_height,
+        );
         let measure = |widget: &gtk::Widget| {
             let visible = widget.get_visible();
             widget.set_visible(true);
@@ -2733,10 +2846,11 @@ impl Ui {
             )
         };
         let (tw, th) = self.strip_size();
+        let edge_gap = crate::edge_surface::scale_px(4);
         let available = if horizontal {
-            screen_width - tw
+            screen_width - tw - 2 * edge_gap
         } else {
-            screen_height - th
+            screen_height - th - 2 * edge_gap
         }
         .max(0);
         let offset = self
@@ -2754,12 +2868,21 @@ impl Ui {
         if self.edge.state().is_revealed() {
             self.edge.strip_offset.set(Some(offset));
         }
+        // 标签不再贴着屏幕边缘，留出 4px 让圆角完整可见；坐标是贴边条表面内的局部坐标。
         let (tx, ty) = match config.edge {
-            ScreenEdge::Left => (0, offset),
-            ScreenEdge::Right => (screen_width - tw, offset),
-            ScreenEdge::Top => (offset, 0),
-            ScreenEdge::Bottom => (offset, screen_height - th),
+            ScreenEdge::Left => (edge_gap, offset),
+            ScreenEdge::Right => (cross - tw - edge_gap, offset),
+            ScreenEdge::Top => (offset, edge_gap),
+            ScreenEdge::Bottom => (offset, cross - th - edge_gap),
         };
+        let (strip_origin_x, strip_origin_y) = match config.edge {
+            ScreenEdge::Left | ScreenEdge::Top => (0, 0),
+            ScreenEdge::Right => (screen_width - cross, 0),
+            ScreenEdge::Bottom => (0, screen_height - cross),
+        };
+        self.edge
+            .strip_screen_bounds
+            .set((strip_origin_x + tx, strip_origin_y + ty, tw, th));
         let position = |widget: &gtk::Widget, x: i32, y: i32| {
             widget.set_halign(gtk::Align::Start);
             widget.set_valign(gtk::Align::Start);
@@ -2772,10 +2895,11 @@ impl Ui {
         // 深度按屏幕边缘长度自动缩放，长度则始终覆盖整条边。
         // Dormant state has no visible trigger. The whole screen edge is the
         // hover/click target, so keep a full-length strip of input there.
+        // 触发厚度按“这条边有多长”缩放：上下边用屏幕宽度，左右边用屏幕高度。
         let edge_length = if horizontal {
-            screen_height
-        } else {
             screen_width
+        } else {
+            screen_height
         };
         let trigger_depth = (edge_length / 100).clamp(
             crate::edge_surface::scale_px(12),
@@ -2783,19 +2907,9 @@ impl Ui {
         );
         let trigger = match config.edge {
             ScreenEdge::Left => (0, 0, trigger_depth, screen_height),
-            ScreenEdge::Right => (
-                screen_width - trigger_depth,
-                0,
-                trigger_depth,
-                screen_height,
-            ),
+            ScreenEdge::Right => (cross - trigger_depth, 0, trigger_depth, screen_height),
             ScreenEdge::Top => (0, 0, screen_width, trigger_depth),
-            ScreenEdge::Bottom => (
-                0,
-                screen_height - trigger_depth,
-                screen_width,
-                trigger_depth,
-            ),
+            ScreenEdge::Bottom => (0, cross - trigger_depth, screen_width, trigger_depth),
         };
         self.edge.trigger_bounds.set(trigger);
         self.edge.strip_bounds.set(
@@ -2927,7 +3041,7 @@ impl Ui {
         }
         if self.edge.toast_note.get().is_some() {
             let (width, height) = measure(self.edge.delete_toast.upcast_ref());
-            let (sx, sy, sw, sh) = self.edge.strip_bounds.get();
+            let (sx, sy, sw, sh) = self.edge.strip_screen_bounds.get();
             let (x, y) = match config.edge {
                 ScreenEdge::Left => (sx + sw + 8, sy + (sh - height) / 2),
                 ScreenEdge::Right => (sx - width - 8, sy + (sh - height) / 2),
@@ -2963,7 +3077,7 @@ impl Ui {
         self.place_edge();
         let weak = Rc::downgrade(self);
         self.edge.toast_motion.animate(
-            &self.edge.strip_window,
+            &self.edge.window,
             1.,
             motion::PANEL_MS,
             self.motion_enabled(),
@@ -2997,7 +3111,7 @@ impl Ui {
         let weak = Rc::downgrade(self);
         let done = weak.clone();
         self.edge.toast_motion.animate(
-            &self.edge.strip_window,
+            &self.edge.window,
             0.,
             motion::PANEL_MS,
             self.motion_enabled(),
@@ -3040,51 +3154,159 @@ impl Ui {
         gesture.current_event()?.position()
     }
     fn strip_input_bounds(&self) -> (i32, i32, i32, i32) {
-        if self.edge.toast_note.get().is_some() {
-            return self.edge.toast_bounds.get();
-        }
-
         let (x, y, width, height) = self.edge.strip_bounds.get();
         let expanded = (self.edge.state().is_revealed()
             || self.edge.strip_phase.get() == StripPhase::Collapsing)
             && !self.edge.state().is_repositioning();
         let pad = if expanded { 20 } else { 7 };
-        let (screen_width, screen_height) = self.note_limits();
+        // 输入区用贴边条表面自己的局部尺寸裁剪；不能再用整屏尺寸。
+        let (surface_width, surface_height) = self.strip_surface_limits();
         let left = (x - pad).max(0);
         let top = (y - pad).max(0);
         (
             left,
             top,
-            (x + width + pad).min(screen_width) - left,
-            (y + height + pad).min(screen_height) - top,
+            (x + width + pad).min(surface_width) - left,
+            (y + height + pad).min(surface_height) - top,
         )
     }
-    pub(super) fn set_input(&self) {
+    pub(super) fn set_input(self: &Rc<Self>) {
         let effects = self.edge.effects(&self.config.borrow(), self.dnd.get());
-        let strip_extra = self
-            .edge
-            .toast_note
-            .get()
-            .is_some()
-            .then(|| self.edge.strip_bounds.get());
+        // 整条选定边框永远是触发热区；标签展开后与标签区域合并，而不是互相替换。
+        let trigger = self.edge.trigger_bounds.get();
+        let strip_primary = Some(self.strip_input_bounds());
+        let strip_extra = Some(trigger);
         let panel_passthrough = (!effects.panel_input
             && self.edge.outgoing_panel.borrow().is_some())
         .then(|| self.edge.panel_bounds.get());
 
-        crate::edge_surface::apply_input_region(
-            &self.edge.strip_window,
-            Some(self.strip_input_bounds()),
-            strip_extra,
-            12,
-            None,
-        );
-        crate::edge_surface::apply_input_region(
-            &self.edge.window,
-            effects.panel_input.then(|| self.edge.panel_bounds.get()),
-            None,
-            18,
-            panel_passthrough,
-        );
+        let strip_ok = if self.edge.strip_window.is_visible() {
+            crate::edge_surface::apply_input_region(
+                &self.edge.strip_window,
+                strip_primary,
+                strip_extra,
+                2,
+                None,
+            )
+        } else {
+            true
+        };
+        let panel_primary = if self.edge.toast_note.get().is_some() {
+            Some(self.edge.toast_bounds.get())
+        } else if effects.panel_input {
+            Some(self.edge.panel_bounds.get())
+        } else {
+            None
+        };
+        let panel_ok = if self.edge.window.is_visible() {
+            crate::edge_surface::apply_input_region(
+                &self.edge.window,
+                panel_primary,
+                None,
+                18,
+                panel_passthrough,
+            )
+        } else {
+            true
+        };
+        if strip_ok && panel_ok {
+            self.edge.input_retry.set(0);
+            // GDK 会把 input region 的提交推迟到下一帧；如果没有绘制，
+            // region 就一直不生效。主动要求一帧，确保热区立刻可用。
+            if self.edge.strip_window.is_visible() {
+                self.edge.strip_window.queue_draw();
+            }
+            if self.edge.window.is_visible() {
+                self.edge.window.queue_draw();
+            }
+        } else {
+            self.schedule_input_retry();
+        }
+    }
+
+    /// surface 尚未 realize/map 时 `set_input` 会失败；这里做有限次重试，
+    /// 保证已映射的 layer surface 不会停留在默认的“整面接收输入”状态。
+    fn schedule_input_retry(self: &Rc<Self>) {
+        let attempt = self.edge.input_retry.get();
+        if attempt >= 20 {
+            return;
+        }
+        self.edge.input_retry.set(attempt + 1);
+        let weak = Rc::downgrade(self);
+        glib::timeout_add_local_once(Duration::from_millis(60), move || {
+            if let Some(ui) = weak.upgrade() {
+                ui.set_input();
+            }
+        });
+    }
+
+    /// 窗口 map 后强制把 layer surface 撑到目标尺寸。
+    ///
+    /// gtk4-layer-shell 在 surface 创建时会先发一个 200×200 的兜底 `set_size`；
+    /// 对 `resizable(false)` 的窗口，map 前设置的默认尺寸不会自动生效，必须
+    /// 在 map 之后真正改变一次默认尺寸（这里改 1px 再改回），它才会重新计算
+    /// preferred size 并发送正确的 `set_size`。
+    pub(super) fn nudge_surface_size(
+        self: &Rc<Self>,
+        window: gtk::ApplicationWindow,
+        root: gtk::Overlay,
+    ) {
+        // 贴边条尺寸由 anchor + margin 决定，不需要再改默认尺寸。
+        if std::ptr::eq(&window, &self.edge.strip_window) {
+            self.place_edge();
+            self.set_input();
+            return;
+        }
+        let (width, height) = if std::ptr::eq(&window, &self.edge.strip_window) {
+            let cross = self.strip_surface_cross();
+            let (screen_width, screen_height) = self.note_limits();
+            if matches!(
+                self.config.borrow().edge,
+                ScreenEdge::Top | ScreenEdge::Bottom
+            ) {
+                (screen_width, cross)
+            } else {
+                (cross, screen_height)
+            }
+        } else {
+            self.note_limits()
+        };
+        // 根控件的 size_request 钉住了窗口尺寸，且窗口是 resizable(false)，
+        // 直接改默认尺寸不会触发重排。先把根控件和默认尺寸都放大 1px，
+        // 等 GTK 真正重排后再收回目标尺寸，layer surface 才会收到正确的 set_size。
+        self.edge.nudging.set(true);
+        root.set_size_request(width + 1, height + 1);
+        window.set_default_size(width + 1, height + 1);
+        let weak = Rc::downgrade(self);
+        glib::timeout_add_local_once(Duration::from_millis(260), move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            let (width, height) = if std::ptr::eq(&window, &ui.edge.strip_window) {
+                let cross = ui.strip_surface_cross();
+                let (screen_width, screen_height) = ui.note_limits();
+                if matches!(
+                    ui.config.borrow().edge,
+                    ScreenEdge::Top | ScreenEdge::Bottom
+                ) {
+                    (screen_width, cross)
+                } else {
+                    (cross, screen_height)
+                }
+            } else {
+                ui.note_limits()
+            };
+            root.set_size_request(width, height);
+            window.set_default_size(width, height);
+            let weak = Rc::downgrade(&ui);
+            glib::timeout_add_local_once(Duration::from_millis(180), move || {
+                if let Some(ui) = weak.upgrade() {
+                    ui.edge.nudging.set(false);
+                    ui.place_edge();
+                    ui.set_input();
+                }
+            });
+        });
     }
 
     pub(super) fn draw_pointer(&self, cr: &gtk::cairo::Context) {
@@ -3396,8 +3618,6 @@ mod tests {
         Policy {
             transient_visible: true,
             hide_in_fullscreen: true,
-            window_active: false,
-            strip_active: false,
         }
     }
 
@@ -3409,7 +3629,8 @@ mod tests {
         assert!(effects.tabs_visible);
         assert_eq!(effects.strip_input, StripInput::Tabs);
         assert!(!effects.panel_input);
-        assert_eq!(effects.strip_keyboard, KeyboardMode::OnDemand);
+        // 便签条只处理指针；键盘交给面板的 OnDemand 新 map。
+        assert_eq!(effects.strip_keyboard, KeyboardMode::None);
         let (state, effects) = transition(state, EdgeEvent::Dock(id), policy());
         assert_eq!(state, EdgeState::Docked(id));
         assert_eq!(effects.panel, Some("editor"));
@@ -3507,7 +3728,8 @@ mod tests {
         ] {
             let (_, effects) = transition(state, EdgeEvent::Visibility, hidden);
             assert!(!effects.strip_visible);
-            assert_eq!(effects.window_visible, state.docked_id().is_some());
+            // 面板只在需要时 map；DND/全屏隐藏时一律不可见。
+            assert!(!effects.window_visible);
             assert_eq!(effects.strip_layer, Layer::Top);
             assert_eq!(
                 effects.window_layer,
@@ -3531,25 +3753,17 @@ mod tests {
     }
 
     #[test]
-    fn explicit_focus_requests_return_to_on_demand() {
-        let (_, effects) = transition(EdgeState::Search, EdgeEvent::FocusWindow, policy());
-        assert_eq!(effects.window_keyboard, KeyboardMode::Exclusive);
-        let (_, effects) = transition(EdgeState::Search, EdgeEvent::WindowFocused, policy());
+    fn panel_uses_on_demand_and_strip_never_grabs_keyboard() {
+        let (_, effects) = transition(EdgeState::Search, EdgeEvent::Refresh, policy());
         assert_eq!(effects.window_keyboard, KeyboardMode::OnDemand);
-        let (_, effects) = transition(EdgeState::Tabs, EdgeEvent::FocusStrip, policy());
-        assert_eq!(effects.strip_keyboard, KeyboardMode::Exclusive);
-        let (_, effects) = transition(EdgeState::Tabs, EdgeEvent::StripFocused, policy());
-        assert_eq!(effects.strip_keyboard, KeyboardMode::OnDemand);
-        let (_, effects) = transition(
-            EdgeState::Search,
-            EdgeEvent::FocusWindow,
-            Policy {
-                window_active: true,
-                ..policy()
-            },
-        );
-        assert_eq!(effects.window_keyboard, KeyboardMode::OnDemand);
+        assert_eq!(effects.strip_keyboard, KeyboardMode::None);
+        let (_, effects) = transition(EdgeState::Tabs, EdgeEvent::Refresh, policy());
+        assert_eq!(effects.window_keyboard, KeyboardMode::None);
+        assert_eq!(effects.strip_keyboard, KeyboardMode::None);
+        // 面板只在有内容时 map：Dormant/Tabs 不再保留全屏面板 surface。
+        assert!(!effects.window_visible);
     }
+
     #[test]
     #[ignore = "requires Wayland and disposable XDG_DATA_HOME/XDG_CONFIG_HOME directories"]
     fn motion_keeps_input_bounds_and_reverses_from_painted_progress() {

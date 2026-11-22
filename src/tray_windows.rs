@@ -124,7 +124,7 @@ unsafe extern "system" fn tray_wnd_proc(
         // into the movable TrayIcon. Explorer has discarded the old icon.
         let hicon = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as HICON;
         if !hicon.is_null() && !add_icon(hwnd, hicon) {
-            eprintln!("Stickies could not restore its tray icon after taskbar recreation.");
+            eprintln!("Niri 侧笺无法在任务栏重建后恢复托盘图标。");
         }
         return 0;
     }
@@ -145,9 +145,9 @@ unsafe extern "system" fn tray_wnd_proc(
                 if !menu.is_null() {
                     let s_new = wide_null("New Note");
                     let s_toggle = wide_null("Toggle Edge Strip");
-                    let s_search = wide_null("Quick Search");
-                    let s_all = wide_null("All Notes && Settings");
-                    let s_quit = wide_null("Quit Stickies");
+                    let s_search = wide_null("快速搜索");
+                    let s_all = wide_null("全部便签与设置");
+                    let s_quit = wide_null("退出 Niri 侧笺");
 
                     AppendMenuW(menu, MF_STRING, CMD_NEW_NOTE, s_new.as_ptr());
                     AppendMenuW(menu, MF_STRING, CMD_TOGGLE_STRIP, s_toggle.as_ptr());
@@ -209,7 +209,7 @@ impl TrayIcon {
         unsafe {
             let message = RegisterWindowMessageW(wide_null("TaskbarCreated").as_ptr());
             if message == 0 {
-                eprintln!("Stickies could not register taskbar recreation notifications.");
+                eprintln!("Niri 侧笺无法注册任务栏重建通知。");
                 return None;
             }
             TASKBAR_CREATED.with(|cell| cell.set(message));

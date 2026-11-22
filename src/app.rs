@@ -74,22 +74,22 @@ impl NoteColor {
 
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Yellow => "Amber",
-            Self::Blue => "Blue",
-            Self::Purple => "Lilac",
-            Self::Green => "Sage",
-            Self::Orange => "Orange",
-            Self::Red => "Red",
-            Self::Pink => "Pink",
-            Self::Lime => "Lime",
-            Self::Teal => "Teal",
-            Self::Cyan => "Cyan",
-            Self::Indigo => "Indigo",
-            Self::Magenta => "Magenta",
-            Self::Brown => "Brown",
-            Self::Gray => "Gray",
-            Self::Black => "Black",
-            Self::White => "White",
+            Self::Yellow => "琥珀",
+            Self::Blue => "蓝色",
+            Self::Purple => "淡紫",
+            Self::Green => "鼠尾草",
+            Self::Orange => "橙色",
+            Self::Red => "红色",
+            Self::Pink => "粉色",
+            Self::Lime => "青柠",
+            Self::Teal => "蓝绿",
+            Self::Cyan => "青色",
+            Self::Indigo => "靛蓝",
+            Self::Magenta => "洋红",
+            Self::Brown => "棕色",
+            Self::Gray => "灰色",
+            Self::Black => "黑色",
+            Self::White => "白色",
         }
     }
 

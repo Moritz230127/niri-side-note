@@ -36,7 +36,7 @@ pub struct NoteSession {
     edit_depth: Cell<usize>,
     mutation_depth: Cell<usize>,
     isolated: Cell<bool>,
-    formatting_error: Option<String>,
+    formatting_error: std::cell::RefCell<Option<String>>,
 }
 
 impl NoteSession {
@@ -63,8 +63,17 @@ impl NoteSession {
                 crate::text_editing::apply(&body, &spans);
                 None
             }
-            Err(error) => Some(format!("无法加载文本格式：{error}")),
+            Err(error) => {
+                // 损坏的格式不能阻止保存/关闭：按纯文本打开，下一次保存会用
+                // 空格式覆盖坏数据。否则 flush 永远失败，便签和整个应用都关不掉。
+                eprintln!(
+                    "Niri 侧笺：便签 {} 的格式数据无法读取，已按纯文本打开：{error}",
+                    note.id.value()
+                );
+                Some(format!("格式数据已损坏，已按纯文本恢复：{error}"))
+            }
         };
+        let formatting_recovered = formatting_error.is_some();
         let initial = EditState {
             title: note.title,
             body: note.body,
@@ -81,7 +90,7 @@ impl NoteSession {
             pinned: Cell::new(note.pinned),
             style: RefCell::new(style),
             storage,
-            dirty: Cell::new(false),
+            dirty: Cell::new(formatting_recovered),
             draft: Cell::new(draft),
             decorating: Cell::new(false),
             render_source: RefCell::new(None),
@@ -97,7 +106,7 @@ impl NoteSession {
             edit_depth: Cell::new(0),
             mutation_depth: Cell::new(0),
             isolated: Cell::new(false),
-            formatting_error,
+            formatting_error: RefCell::new(formatting_error),
         });
         let weak = Rc::downgrade(&session);
         session.title.connect_text_notify(move |_| {
@@ -458,7 +467,7 @@ impl NoteSession {
         self.style.borrow().clone()
     }
     pub fn error(&self) -> Option<String> {
-        self.formatting_error.clone().or_else(|| {
+        self.formatting_error.borrow().clone().or_else(|| {
             self.error
                 .borrow()
                 .clone()
@@ -551,9 +560,8 @@ impl NoteSession {
     }
 
     pub fn flush(&self) -> bool {
-        if self.formatting_error.is_some() {
-            return false;
-        }
+        // 格式加载失败不再是“致命错误”：没有编辑就直接允许关闭，
+        // 有编辑则用当前文本（空格式）覆盖损坏数据。
         self.record_edit();
         if let Some(source) = self.save_source.borrow_mut().take() {
             source.remove();
@@ -575,6 +583,7 @@ impl NoteSession {
         {
             Ok(()) => {
                 self.dirty.set(false);
+                self.formatting_error.replace(None);
                 self.error.borrow_mut().take();
                 if !self.is_blank() {
                     self.draft.set(false);
@@ -1531,7 +1540,7 @@ mod tests {
                 .is_active()
         );
         assert!(
-            !swatch(second.root.upcast_ref(), "Amber")
+            !swatch(second.root.upcast_ref(), "琥珀")
                 .unwrap()
                 .is_active()
         );

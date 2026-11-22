@@ -88,7 +88,7 @@ pub fn register() -> Result<(), Box<dyn std::error::Error>> {
             register_font_path(&path, name)
         };
         if let Err(error) = register_font() {
-            eprintln!("Warning: could not load bundled font {name}: {error}");
+            eprintln!("警告：无法加载内置字体 {name}：{error}");
         }
     }
     Ok(())

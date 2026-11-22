@@ -9,14 +9,14 @@ pub use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 pub fn check_display_support() -> Result<(), String> {
     if !gtk4_layer_shell::is_supported() {
         return Err(
-            "Niri 侧笺 requires Wayland with zwlr_layer_shell_v1 version 4 or newer; Layer Shell is unavailable on this display."
+            "Niri 侧笺需要支持 zwlr_layer_shell_v1 的 Wayland 合成器；当前显示环境没有可用的 Layer Shell。"
                 .into(),
         );
     }
     let protocol_version = gtk4_layer_shell::protocol_version();
     if protocol_version < 4 {
         return Err(format!(
-            "Niri 侧笺 requires zwlr_layer_shell_v1 version 4 or newer for on-demand keyboard focus; this display provides version {protocol_version}."
+            "Niri 侧笺需要 zwlr_layer_shell_v1 v4 及以上版本才能按需获取键盘焦点；当前合成器只提供 v{protocol_version}。"
         ));
     }
     Ok(())
@@ -31,22 +31,53 @@ pub fn sync_surface_geometry(
 ) {
 }
 
+/// 把输入区域同步给当前 Wayland surface。
+///
+/// 返回 `false` 表示 surface 还没有创建（窗口尚未 realize/map）。调用方必须
+/// 在窗口 map 之后重试，否则新 surface 会保留“整面都接收输入”的默认区域，
+/// 一个全屏 layer surface 就会吞掉整个桌面的点击。
 #[cfg(target_os = "linux")]
 pub fn apply_input_region(
     window: &gtk::ApplicationWindow,
     primary_bounds: Option<(i32, i32, i32, i32)>,
-    _extra_bounds: Option<(i32, i32, i32, i32)>,
-    _visual_pad: i32,
-    _passthrough_bounds: Option<(i32, i32, i32, i32)>,
-) {
+    extra_bounds: Option<(i32, i32, i32, i32)>,
+    visual_pad: i32,
+    passthrough_bounds: Option<(i32, i32, i32, i32)>,
+) -> bool {
     use gtk::prelude::*;
-    if let Some(surface) = window.surface() {
-        let region = gtk::cairo::Region::create();
-        if let Some((x, y, width, height)) = primary_bounds {
-            let _ = region.union_rectangle(&gtk::cairo::RectangleInt::new(x, y, width, height));
+    let Some(surface) = window.surface() else {
+        return false;
+    };
+    let region = gtk::cairo::Region::create();
+    let surface_width = surface.width().max(1);
+    let surface_height = surface.height().max(1);
+    let add = |(x, y, width, height): (i32, i32, i32, i32), pad: i32| {
+        if width <= 0 || height <= 0 {
+            return;
         }
-        surface.set_input_region(Some(&region));
+        let x1 = (x - pad).max(0);
+        let y1 = (y - pad).max(0);
+        let x2 = (x + width + pad).min(surface_width);
+        let y2 = (y + height + pad).min(surface_height);
+        if x2 > x1 && y2 > y1 {
+            let _ =
+                region.union_rectangle(&gtk::cairo::RectangleInt::new(x1, y1, x2 - x1, y2 - y1));
+        }
+    };
+    if let Some(bounds) = primary_bounds {
+        add(bounds, visual_pad.max(0));
     }
+    if let Some(bounds) = extra_bounds {
+        add(bounds, 0);
+    }
+    if let Some((x, y, width, height)) = passthrough_bounds
+        && width > 0
+        && height > 0
+    {
+        let _ = region.subtract_rectangle(&gtk::cairo::RectangleInt::new(x, y, width, height));
+    }
+    surface.set_input_region(Some(&region));
+    true
 }
 
 #[cfg(target_os = "linux")]
@@ -666,7 +697,7 @@ mod imp_windows {
                 unsafe {
                     drop(Box::from_raw(data));
                 }
-                eprintln!("Could not install detached-note resize limits");
+                eprintln!("无法设置独立便签的缩放限制");
                 return;
             }
             // Fixed GTK windows receive equal native min/max sizes, which
@@ -720,7 +751,7 @@ mod imp_windows {
         extra_bounds: Option<(i32, i32, i32, i32)>,
         visual_pad: i32,
         passthrough_bounds: Option<(i32, i32, i32, i32)>,
-    ) {
+    ) -> bool {
         // On Windows, let SetWindowRgn control the OS hit-test region and keep GDK's
         // internal input_region unclipped so GDK never drops mouse-leave transitions
         // inside the padded HRGN border.
@@ -742,7 +773,7 @@ mod imp_windows {
         sync_hwnd_styles_and_z(window);
 
         let Some(hwnd) = hwnd_opt else {
-            return;
+            return false;
         };
         let scale = window.surface().map_or(1, |s| s.scale_factor().max(1));
         let make_rgn = |(x, y, w, h): (i32, i32, i32, i32), pad: i32| unsafe {
@@ -767,6 +798,7 @@ mod imp_windows {
             };
             SetWindowRgn(hwnd, hrgn, 1);
         }
+        true
     }
 
     pub fn connect_hover_fallback(
@@ -911,7 +943,7 @@ mod imp_windows {
                         )
                     } == 0
                 {
-                    eprintln!("Niri 侧笺 could not preserve the edge window's taskbar style.");
+                    eprintln!("Niri 侧笺无法保留贴边窗口的任务栏样式。");
                 }
                 sync_hwnd_styles_and_z(window);
                 let info = STATES.with(|map| {

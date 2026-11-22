@@ -1335,10 +1335,7 @@ mod feedback_tests {
         let manager = ui.manager.borrow().clone().unwrap();
         let manager = &manager.0;
         assert_eq!(manager.empty_title.text(), "欢迎使用 Niri 侧笺");
-        assert_eq!(
-            manager.empty_action.label().as_deref(),
-            Some("Create your first note")
-        );
+        assert_eq!(manager.empty_action.label().as_deref(), Some("新建便签"));
         assert!(!manager.filter_row.is_visible());
         manager.create();
         let first = manager.selected.get().unwrap();
@@ -1372,7 +1369,7 @@ mod feedback_tests {
         assert_eq!(manager.empty_title.text(), "欢迎使用 Niri 侧笺");
         fn undo_button(widget: &gtk::Widget) -> Option<gtk::Button> {
             if let Some(button) = widget.downcast_ref::<gtk::Button>()
-                && button.label().as_deref() == Some("Undo")
+                && button.label().as_deref() == Some("撤销")
             {
                 return Some(button.clone());
             }
