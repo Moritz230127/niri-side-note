@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FDFAF4"/>
+      <stop offset="0.6" stop-color="#F7EFE1"/>
+      <stop offset="1" stop-color="#EDE0C9"/>
+    </linearGradient>
+    <radialGradient id="blobWarm" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F3C9A6" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#F3C9A6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobSage" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#C9DCC0" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#C9DCC0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#28323B"/>
+      <stop offset="1" stop-color="#12181D"/>
+    </linearGradient>
+    <radialGradient id="screenGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4E7A78" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#4E7A78" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFCF5"/>
+      <stop offset="1" stop-color="#FAF0DA"/>
+    </linearGradient>
+    <filter id="screenShadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="34" flood-color="#2A2723" flood-opacity="0.26"/>
+    </filter>
+    <filter id="cardShadow" x="-25%" y="-25%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#0B0E10" flood-opacity="0.28"/>
+    </filter>
+    <filter id="tabShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="-4" dy="5" stdDeviation="7" flood-color="#0B0E10" flood-opacity="0.42"/>
+    </filter>
+    <filter id="toolShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="-3" dy="5" stdDeviation="8" flood-color="#0B0E10" flood-opacity="0.40"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <ellipse cx="1420" cy="120" rx="520" ry="360" fill="url(#blobWarm)"/>
+  <ellipse cx="160" cy="940" rx="480" ry="300" fill="url(#blobSage)"/>
+
+  <!-- 桌面 -->
+  <g filter="url(#screenShadow)">
+    <rect x="120" y="110" width="1360" height="780" rx="30" fill="url(#wall)" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="1.5"/>
+  </g>
+  <ellipse cx="980" cy="260" rx="600" ry="420" fill="url(#screenGlow)"/>
+  <text x="172" y="150" font-family="Noto Sans CJK SC" font-weight="500" font-size="13" fill="#FFFFFF" fill-opacity="0.28" letter-spacing="1">niri</text>
+
+  <!-- 背景窗口 -->
+  <rect x="196" y="168" width="430" height="304" rx="16" fill="#FFFFFF" fill-opacity="0.035" stroke="#FFFFFF" stroke-opacity="0.06"/>
+  <g fill="#FFFFFF" fill-opacity="0.06">
+    <rect x="228" y="206" width="180" height="10" rx="5"/>
+    <rect x="228" y="232" width="280" height="8" rx="4"/>
+    <rect x="228" y="252" width="240" height="8" rx="4"/>
+    <rect x="228" y="286" width="330" height="8" rx="4"/>
+    <rect x="228" y="306" width="300" height="8" rx="4"/>
+    <rect x="228" y="326" width="200" height="8" rx="4"/>
+  </g>
+
+  <!-- 触发带高亮（在标签下方） -->
+  <rect x="1434" y="128" width="44" height="744" rx="16" fill="#C98F5B" fill-opacity="0.07"
+        stroke="#C98F5B" stroke-opacity="0.42" stroke-width="1.5" stroke-dasharray="9 8"/>
+
+  <!-- 便签面板 -->
+  <g filter="url(#cardShadow)">
+    <rect x="700" y="190" width="680" height="620" rx="24" fill="url(#card)"/>
+  </g>
+  <circle cx="748" cy="248" r="9" fill="#E8B45B"/>
+  <text x="776" y="262" font-family="Noto Serif CJK SC" font-weight="700" font-size="42" fill="#2A2723">会议纪要</text>
+  <text x="748" y="306" font-family="Noto Sans CJK SC" font-weight="400" font-size="15" fill="#9B907E">11月22日 · 周五 · 琥珀</text>
+  <line x1="748" y1="330" x2="1332" y2="330" stroke="#2A2723" stroke-opacity="0.10"/>
+
+  <text x="748" y="382" font-family="Noto Sans CJK SC" font-weight="400" font-size="19" fill="#4A443B">下周三之前把方案定稿，重点确认贴边交互与键盘焦点。</text>
+  <text x="748" y="416" font-family="Noto Sans CJK SC" font-weight="400" font-size="19" fill="#4A443B">整条边触发、手动选屏和圆角标签都要在真机验证一遍。</text>
+
+  <text x="748" y="474" font-family="Noto Sans CJK SC" font-weight="500" font-size="13" fill="#8C8172" letter-spacing="2">检查清单</text>
+
+  <!-- 清单第一项：已完成 -->
+  <rect x="748" y="492" width="22" height="22" rx="7" fill="#2A2723"/>
+  <path d="M752.6 503.4 l4 4.2 l8 -9.2" fill="none" stroke="#FBF4E2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="786" y="510" font-family="Noto Sans CJK SC" font-weight="400" font-size="18" fill="#9B907E" text-decoration="line-through">整条选定边框作为热区</text>
+
+  <!-- 第二项 -->
+  <rect x="748" y="544" width="22" height="22" rx="7" fill="none" stroke="#BFB49F" stroke-width="1.6"/>
+  <text x="786" y="562" font-family="Noto Sans CJK SC" font-weight="400" font-size="18" fill="#4A443B">手动选择屏幕与四边布局</text>
+
+  <!-- 第三项 -->
+  <rect x="748" y="596" width="22" height="22" rx="7" fill="none" stroke="#BFB49F" stroke-width="1.6"/>
+  <text x="786" y="614" font-family="Noto Sans CJK SC" font-weight="400" font-size="18" fill="#4A443B">圆角标签在四边的视觉一致性</text>
+
+  <!-- 底部控件 -->
+  <g>
+    <rect x="748" y="700" width="40" height="40" rx="11" fill="#2A2723" fill-opacity="0.05"/>
+    <text x="768" y="727" text-anchor="middle" font-family="Noto Sans CJK SC" font-weight="700" font-size="17" fill="#4A443B">B</text>
+    <rect x="796" y="700" width="40" height="40" rx="11" fill="#2A2723" fill-opacity="0.05"/>
+    <text x="816" y="727" text-anchor="middle" font-family="Noto Serif CJK SC" font-weight="700" font-style="italic" font-size="17" fill="#4A443B">I</text>
+    <rect x="844" y="700" width="40" height="40" rx="11" fill="#2A2723" fill-opacity="0.05"/>
+    <text x="864" y="727" text-anchor="middle" font-family="Noto Sans CJK SC" font-weight="400" font-size="17" fill="#4A443B" text-decoration="underline">U</text>
+    <rect x="892" y="700" width="40" height="40" rx="11" fill="#2A2723" fill-opacity="0.05"/>
+    <text x="912" y="727" text-anchor="middle" font-family="Noto Sans CJK SC" font-weight="400" font-size="17" fill="#4A443B" text-decoration="line-through">S</text>
+  </g>
+  <rect x="1204" y="704" width="128" height="32" rx="16" fill="#2A2723" fill-opacity="0.06"/>
+  <text x="1268" y="725" text-anchor="middle" font-family="Noto Sans CJK SC" font-weight="400" font-size="12" fill="#8C8172">已自动保存</text>
+
+  <!-- 贴边标签 -->
+  <g filter="url(#tabShadow)">
+    <rect x="1420" y="180" width="52" height="100" rx="15" fill="#FAEDBD" stroke="#FFFFFF" stroke-width="3"/>
+    <rect x="1424" y="290" width="50" height="100" rx="15" fill="#BFF7CF"/>
+    <rect x="1424" y="400" width="50" height="100" rx="15" fill="#DBCCF0"/>
+    <rect x="1424" y="510" width="50" height="100" rx="15" fill="#FFD4AB"/>
+    <rect x="1424" y="620" width="50" height="100" rx="15" fill="#B5D9FF"/>
+  </g>
+  <g font-family="Noto Sans CJK SC" font-weight="600" font-size="17" fill="#2E2A24" text-anchor="middle">
+    <text x="1446" y="216">会</text><text x="1446" y="237">议</text><text x="1446" y="258">纪</text><text x="1446" y="279">要</text>
+    <text x="1449" y="326">购</text><text x="1449" y="347">物</text><text x="1449" y="368">清</text><text x="1449" y="389">单</text>
+    <text x="1449" y="436">设</text><text x="1449" y="457">计</text><text x="1449" y="478">灵</text><text x="1449" y="499">感</text>
+    <text x="1449" y="546">待</text><text x="1449" y="567">办</text><text x="1449" y="588">事</text><text x="1449" y="609">项</text>
+    <text x="1449" y="656">读</text><text x="1449" y="677">书</text><text x="1449" y="698">笔</text><text x="1449" y="719">记</text>
+  </g>
+
+  <!-- 工具胶囊 -->
+  <g filter="url(#toolShadow)">
+    <rect x="1420" y="740" width="52" height="112" rx="26" fill="#F6EFDB"/>
+  </g>
+  <g stroke="#2A2723" stroke-width="2" stroke-linecap="round" fill="none">
+    <path d="M1436 766 h20 M1446 756 v20"/>
+    <circle cx="1443" cy="798" r="7.5"/>
+    <path d="M1449 804 l7 7"/>
+    <rect x="1436" y="822" width="7" height="7" rx="1.8"/>
+    <rect x="1447" y="822" width="7" height="7" rx="1.8"/>
+    <rect x="1436" y="833" width="7" height="7" rx="1.8"/>
+    <rect x="1447" y="833" width="7" height="7" rx="1.8"/>
+  </g>
+
+  <!-- 底部标注 -->
+  <circle cx="142" cy="948" r="4" fill="#C98F5B"/>
+  <text x="158" y="954" font-family="Noto Sans CJK SC" font-weight="400" font-size="15" fill="#8C8172">整条选定边框 = 触发热区（约 45px）</text>
+  <circle cx="486" cy="948" r="4" fill="#9DB7A1"/>
+  <text x="502" y="954" font-family="Noto Sans CJK SC" font-weight="400" font-size="15" fill="#8C8172">圆角标签 · 便签色填充 · 白色描边表示当前便签</text>
+
+  <text x="1480" y="954" text-anchor="end" font-family="Noto Sans CJK SC" font-weight="400" font-size="14" fill="#A79B89">niri · 右侧贴边 · Paper 主题</text>
+</svg>

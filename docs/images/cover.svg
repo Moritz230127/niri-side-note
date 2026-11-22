@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FDFAF4"/>
+      <stop offset="0.55" stop-color="#F7EFE1"/>
+      <stop offset="1" stop-color="#EFE2CB"/>
+    </linearGradient>
+    <radialGradient id="blobWarm" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F4CBA9" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#F4CBA9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobSage" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#C9DCC0" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#C9DCC0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#263039"/>
+      <stop offset="1" stop-color="#141A1F"/>
+    </linearGradient>
+    <radialGradient id="screenGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4E7A78" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#4E7A78" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFCF4"/>
+      <stop offset="1" stop-color="#FAF1DC"/>
+    </linearGradient>
+    <filter id="screenShadow" x="-25%" y="-25%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="22" stdDeviation="30" flood-color="#2A2723" flood-opacity="0.28"/>
+    </filter>
+    <filter id="cardShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0B0E10" flood-opacity="0.24"/>
+    </filter>
+    <filter id="tabShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="-3" dy="4" stdDeviation="6" flood-color="#0B0E10" flood-opacity="0.40"/>
+    </filter>
+    <filter id="toolShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="-2" dy="4" stdDeviation="7" flood-color="#0B0E10" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="640" fill="url(#bg)"/>
+  <ellipse cx="1370" cy="90" rx="520" ry="340" fill="url(#blobWarm)"/>
+  <ellipse cx="210" cy="640" rx="470" ry="300" fill="url(#blobSage)"/>
+
+  <!-- 左侧文字 -->
+  <rect x="96" y="102" width="258" height="36" rx="18" fill="#2A2723"/>
+  <circle cx="118" cy="120" r="5" fill="#F2C07E"/>
+  <text x="132" y="125" font-family="Noto Sans CJK SC" font-weight="500" font-size="14" fill="#F7EFE1" letter-spacing="1">niri 26.04 · v0.11.0</text>
+
+  <text x="92" y="246" font-family="Noto Serif CJK SC" font-weight="700" font-size="106" fill="#241F1A" letter-spacing="2">Niri 侧笺</text>
+  <rect x="96" y="272" width="104" height="7" rx="3.5" fill="#C98F5B"/>
+
+  <text x="96" y="334" font-family="Noto Sans CJK SC" font-weight="500" font-size="30" fill="#5F574C">贴边便签，安静地待在屏幕边缘。</text>
+  <text x="96" y="374" font-family="Noto Sans CJK SC" font-weight="400" font-size="18" fill="#857A6B">整条选定边框都是热区 · 手动选择屏幕 · 圆角标签 · 仅中文界面</text>
+
+  <g font-family="Noto Sans CJK SC" font-weight="500" font-size="16" fill="#4A443B">
+    <rect x="96" y="414" width="122" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.62" stroke="#D9CCB7"/>
+    <text x="157" y="440" text-anchor="middle">整条边触发</text>
+    <rect x="230" y="414" width="106" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.62" stroke="#D9CCB7"/>
+    <text x="283" y="440" text-anchor="middle">手动选屏</text>
+    <rect x="348" y="414" width="106" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.62" stroke="#D9CCB7"/>
+    <text x="401" y="440" text-anchor="middle">圆角标签</text>
+    <rect x="466" y="414" width="106" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.62" stroke="#D9CCB7"/>
+    <text x="519" y="440" text-anchor="middle">简体中文</text>
+  </g>
+
+  <text x="96" y="566" font-family="Noto Sans CJK SC" font-weight="400" font-size="14" fill="#8C8172">MPL-2.0 开源 · 基于 0atxl/stickies · github.com/Moritz230127/niri-side-note</text>
+
+  <!-- 右侧屏幕 -->
+  <g filter="url(#screenShadow)">
+    <rect x="966" y="84" width="564" height="472" rx="26" fill="url(#wall)" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="1.5"/>
+  </g>
+  <ellipse cx="1290" cy="150" rx="280" ry="190" fill="url(#screenGlow)"/>
+  <rect x="1002" y="128" width="392" height="340" rx="16" fill="#FFFFFF" fill-opacity="0.035" stroke="#FFFFFF" stroke-opacity="0.06"/>
+
+  <!-- 便签卡片 -->
+  <rect x="1040" y="162" width="330" height="344" rx="18" fill="#E8D7B4" fill-opacity="0.45"/>
+  <g filter="url(#cardShadow)">
+    <rect x="1020" y="150" width="330" height="344" rx="18" fill="url(#card)"/>
+  </g>
+  <circle cx="1052" cy="187" r="6" fill="#E8B45B"/>
+  <text x="1070" y="197" font-family="Noto Serif CJK SC" font-weight="700" font-size="26" fill="#2A2723">会议纪要</text>
+  <text x="1052" y="226" font-family="Noto Sans CJK SC" font-weight="400" font-size="12" fill="#9B907E">11月22日 · 周五 · 琥珀</text>
+  <line x1="1052" y1="244" x2="1318" y2="244" stroke="#2A2723" stroke-opacity="0.10"/>
+  <g fill="#2A2723" fill-opacity="0.14">
+    <rect x="1052" y="262" width="240" height="8" rx="4"/>
+    <rect x="1052" y="282" width="212" height="8" rx="4"/>
+    <rect x="1052" y="302" width="230" height="8" rx="4"/>
+    <rect x="1052" y="322" width="168" height="8" rx="4"/>
+  </g>
+  <g>
+    <rect x="1052" y="372" width="16" height="16" rx="5" fill="#2A2723"/>
+    <path d="M1055.5 380.2 l3.2 3.4 l6.2 -7" fill="none" stroke="#FBF4E2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="1080" y="376" width="150" height="8" rx="4" fill="#2A2723" fill-opacity="0.11"/>
+    <rect x="1052" y="410" width="16" height="16" rx="5" fill="none" stroke="#BFB49F" stroke-width="1.5"/>
+    <rect x="1080" y="414" width="122" height="8" rx="4" fill="#2A2723" fill-opacity="0.11"/>
+    <rect x="1052" y="448" width="16" height="16" rx="5" fill="none" stroke="#BFB49F" stroke-width="1.5"/>
+    <rect x="1080" y="452" width="166" height="8" rx="4" fill="#2A2723" fill-opacity="0.11"/>
+  </g>
+  <rect x="1052" y="466" width="70" height="22" rx="11" fill="#2A2723" fill-opacity="0.06"/>
+  <text x="1087" y="481" font-family="Noto Sans CJK SC" font-weight="400" font-size="10" fill="#8C8172" text-anchor="middle">已保存</text>
+
+  <!-- 贴边标签 -->
+  <g filter="url(#tabShadow)">
+    <rect x="1478" y="140" width="48" height="96" rx="14" fill="#FAEDBD" stroke="#FFFFFF" stroke-width="2.5"/>
+    <rect x="1480" y="244" width="46" height="96" rx="14" fill="#BFF7CF"/>
+    <rect x="1480" y="348" width="46" height="96" rx="14" fill="#DBCCF0"/>
+  </g>
+  <g font-family="Noto Sans CJK SC" font-weight="600" font-size="16" fill="#2E2A24" text-anchor="middle">
+    <text x="1502" y="172">会</text><text x="1502" y="192">议</text><text x="1502" y="212">纪</text><text x="1502" y="232">要</text>
+    <text x="1503" y="276">购</text><text x="1503" y="296">物</text><text x="1503" y="316">清</text><text x="1503" y="336">单</text>
+    <text x="1503" y="380">设</text><text x="1503" y="400">计</text><text x="1503" y="420">灵</text><text x="1503" y="440">感</text>
+  </g>
+
+  <!-- 工具胶囊 -->
+  <g filter="url(#toolShadow)">
+    <rect x="1478" y="456" width="48" height="88" rx="24" fill="#F6EFDB"/>
+  </g>
+  <g stroke="#2A2723" stroke-width="2" stroke-linecap="round" fill="none">
+    <path d="M1493 478 h18 M1502 469 v18"/>
+    <circle cx="1500" cy="504" r="7"/>
+    <path d="M1505.5 509.5 l6 6"/>
+    <rect x="1493" y="524" width="6" height="6" rx="1.5"/>
+    <rect x="1502" y="524" width="6" height="6" rx="1.5"/>
+    <rect x="1493" y="533" width="6" height="6" rx="1.5"/>
+    <rect x="1502" y="533" width="6" height="6" rx="1.5"/>
+  </g>
+
+  <text x="1208" y="604" text-anchor="middle" font-family="Noto Sans CJK SC" font-weight="400" font-size="14" fill="#8C8172">所选屏幕的整条选定边框 = 触发热区</text>
+</svg>
